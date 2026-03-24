@@ -58,7 +58,7 @@ func main() {
 }
 
 func serveIndex(w http.ResponseWriter, r *http.Request) {
-	content, err := staticFiles.ReadFile("index.html")
+	content, err := staticFiles.ReadFile("assets/index.html")
 	if err != nil {
 		http.Error(w, "Failed to read index.html", http.StatusInternalServerError)
 		return
