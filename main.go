@@ -12,7 +12,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-//go:embed assets/index.html
+//go:embed src/index.html
 var staticFiles embed.FS
 
 // Node represents a commit node in the graph
@@ -58,7 +58,7 @@ func main() {
 }
 
 func serveIndex(w http.ResponseWriter, r *http.Request) {
-	content, err := staticFiles.ReadFile("assets/index.html")
+	content, err := staticFiles.ReadFile("src/index.html")
 	if err != nil {
 		http.Error(w, "Failed to read index.html", http.StatusInternalServerError)
 		return
@@ -220,20 +220,18 @@ func getChangedFiles(c *object.Commit) []string {
 
 // topologicalSort performs Kahn's algorithm for topological ordering
 func topologicalSort(commits map[string]*CommitData, initialOrder []string) []string {
-	// Build in-degree map (children count for each commit)
+	// Build in-degree map (number of children for each commit)
 	inDegree := make(map[string]int)
-	children := make(map[string][]string)
 
 	for hash := range commits {
 		inDegree[hash] = 0
 	}
 
-	// Build reverse graph (child -> parent becomes parent -> child for processing)
-	for hash, commit := range commits {
+	// Build child->parent edges (so children are processed before parents)
+	for _, commit := range commits {
 		for _, parent := range commit.Parents {
 			if _, exists := commits[parent]; exists {
-				children[parent] = append(children[parent], hash)
-				inDegree[hash]++
+				inDegree[parent]++
 			}
 		}
 	}
