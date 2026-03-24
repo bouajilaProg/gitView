@@ -1,50 +1,47 @@
 # gitView
 
-A single-binary Git repository visualizer with an interactive DAG (Directed Acyclic Graph) canvas view.
+Single-binary Git repository visualizer with an interactive DAG canvas.
 
 ## Features
 
-- Interactive canvas with zoom and pan controls
-- Topological sorting with lane assignment for clean branch visualization
-- Bezier curves connecting commits
-- Click on commits to view details (message, author, date, files changed)
-- Single self-contained binary (HTML embedded via go:embed)
+- Horizontal branch layout with consistent lane coloring
+- Clickable commits with detail panel (message, author, date, files)
+- Zoom, pan, and keyboard shortcuts
+- Embedded frontend assets (no external build step)
+
+## Project Structure
+
+- `src/` Go backend (server + graph logic)
+- `src/web/` Frontend assets (HTML, JS, CSS)
 
 ## Installation
 
 ### From Release
 
-Download the appropriate binary for your platform from the [Releases](../../releases) page.
+Download the appropriate binary from the releases page:
+https://github.com/bouajilaProg/gitView/releases
 
 ### Build from Source
 
 ```bash
-go build -o gitView .
+go build -o gitView ./src
 ```
 
 ## Usage
 
-Navigate to any git repository and run:
+Run inside any Git repository:
 
 ```bash
 ./gitView
 ```
 
-Then open http://localhost:6060 in your browser.
+Open http://localhost:6060 in your browser.
 
 ## Controls
 
-- **Scroll**: Zoom in/out
-- **Drag**: Pan the canvas
-- **Click**: Select a commit to view details
-
-## Project Structure
-
-- `src/index.html` is the embedded frontend source
-- `assets/` is reserved for static assets during development
-
-## Tech Stack
-
-- **Backend**: Go with [go-git](https://github.com/go-git/go-git)
-- **Frontend**: Vanilla JavaScript with Canvas API
-- **Styling**: Tailwind CSS (via CDN)
+- Scroll: zoom in/out
+- Drag: pan the canvas
+- Click: select commit
+- R: reset view
+- M: toggle messages
+- Esc: close detail panel
