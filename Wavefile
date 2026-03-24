@@ -6,8 +6,8 @@ category = "personal"
 tags = ["dev-tools","git"]
 
 [flow]
-dev = {
-    cmd= "go build",
-    on_success= "./gitView",
-    watch=["*.go","assets/*","src/*"]
-  }
+  dev = {
+     cmd= "go build -o gitView ./src/core",
+     on_success= "./gitView",
+     watch=["*.go","assets/*","src/*"]
+   }
