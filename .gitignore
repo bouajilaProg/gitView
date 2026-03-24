@@ -11,3 +11,6 @@ gitView.exe
 # OS
 .DS_Store
 Thumbs.db
+
+# temp
+*.temp.*
