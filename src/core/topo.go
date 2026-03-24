@@ -1,17 +1,36 @@
 package main
 
-import "sort"
+import (
+	"container/heap"
+)
 
-// topologicalSort performs Kahn's algorithm for topological ordering
-func topologicalSort(commits map[string]*CommitData, initialOrder []string) []string {
-	// Build in-degree map (number of children for each commit)
-	inDegree := make(map[string]int)
+// PriorityQueue implements heap.Interface and holds Commits
+type PriorityQueue struct {
+	hashes  []string
+	commits map[string]*CommitData
+}
 
-	for hash := range commits {
-		inDegree[hash] = 0
+func (pq PriorityQueue) Len() int { return len(pq.hashes) }
+func (pq PriorityQueue) Less(i, j int) bool {
+	// Same sorting logic: Newer date first, then lexicographical hash
+	iDate, jDate := pq.commits[pq.hashes[i]].Date, pq.commits[pq.hashes[j]].Date
+	if iDate.Equal(jDate) {
+		return pq.hashes[i] < pq.hashes[j]
 	}
+	return iDate.After(jDate)
+}
+func (pq PriorityQueue) Swap(i, j int)       { pq.hashes[i], pq.hashes[j] = pq.hashes[j], pq.hashes[i] }
+func (pq *PriorityQueue) Push(x interface{}) { pq.hashes = append(pq.hashes, x.(string)) }
+func (pq *PriorityQueue) Pop() interface{} {
+	old := pq.hashes
+	n := len(old)
+	item := old[n-1]
+	pq.hashes = old[0 : n-1]
+	return item
+}
 
-	// Build child->parent edges (so children are processed before parents)
+func topologicalSortOptimized(commits map[string]*CommitData) []string {
+	inDegree := make(map[string]int)
 	for _, commit := range commits {
 		for _, parent := range commit.Parents {
 			if _, exists := commits[parent]; exists {
@@ -20,50 +39,34 @@ func topologicalSort(commits map[string]*CommitData, initialOrder []string) []st
 		}
 	}
 
-	// Start with commits that have no children (leaf commits / HEAD)
-	var queue []string
+	// Initialize the Priority Queue with "leaf" commits
+	pq := &PriorityQueue{commits: commits}
+	heap.Init(pq)
 	for hash := range commits {
 		if inDegree[hash] == 0 {
-			queue = append(queue, hash)
+			heap.Push(pq, hash)
 		}
 	}
 
-	// Sort queue by date for deterministic ordering
-	sort.Slice(queue, func(i, j int) bool {
-		left := commits[queue[i]].Date
-		right := commits[queue[j]].Date
-		if left.Equal(right) {
-			return queue[i] < queue[j]
-		}
-		return left.After(right)
-	})
-
 	var sorted []string
-	for len(queue) > 0 {
-		// Pop first element
-		current := queue[0]
-		queue = queue[1:]
+	for pq.Len() > 0 {
+		// Pop the "best" commit based on date (O(log n) instead of O(n log n))
+		current := heap.Pop(pq).(string)
 		sorted = append(sorted, current)
 
-		// Process parents (reduce their in-degree)
 		for _, parent := range commits[current].Parents {
 			if _, exists := commits[parent]; exists {
 				inDegree[parent]--
 				if inDegree[parent] == 0 {
-					queue = append(queue, parent)
-					// Re-sort queue by date
-					sort.Slice(queue, func(i, j int) bool {
-						left := commits[queue[i]].Date
-						right := commits[queue[j]].Date
-						if left.Equal(right) {
-							return queue[i] < queue[j]
-						}
-						return left.After(right)
-					})
+					heap.Push(pq, parent) // Auto-sorts on insert
 				}
 			}
 		}
 	}
-
 	return sorted
+}
+
+// topologicalSort keeps the legacy signature for callers.
+func topologicalSort(commits map[string]*CommitData, initialOrder []string) []string {
+	return topologicalSortOptimized(commits)
 }
