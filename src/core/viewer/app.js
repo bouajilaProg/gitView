@@ -41,6 +41,11 @@ const loadingState = document.getElementById('loading-state');
 const emptyState = document.getElementById('empty-state');
 const closeBtn = document.getElementById('close-panel');
 const toggleMessagesBtn = document.getElementById('toggle-messages');
+const tabDetailsBtn = document.getElementById('tab-details');
+const tabCommandsBtn = document.getElementById('tab-commands');
+const detailContent = document.getElementById('detail-content');
+const commandsContent = document.getElementById('commands-content');
+const commandsList = document.getElementById('detail-commands');
 
 // Resize handler
 function resizeCanvas() {
@@ -52,6 +57,7 @@ function resizeCanvas() {
 // Initialize
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
+setActiveTab('details');
 
 // Toggle messages
 toggleMessagesBtn.addEventListener('click', () => {
@@ -354,6 +360,7 @@ function showDetail(node) {
 
   panelBackdrop.classList.remove('hidden');
   detailPanel.classList.remove('translate-x-full');
+  updateCommands(node);
   render();
 }
 
@@ -370,6 +377,48 @@ closeBtn.addEventListener('click', hideDetail);
 
 // Event: Click backdrop to close
 panelBackdrop.addEventListener('click', hideDetail);
+
+function setActiveTab(tab) {
+  const isDetails = tab === 'details';
+  detailContent.classList.toggle('hidden', !isDetails);
+  commandsContent.classList.toggle('hidden', isDetails);
+  tabDetailsBtn.classList.toggle('bg-zinc-700', isDetails);
+  tabDetailsBtn.classList.toggle('text-zinc-100', isDetails);
+  tabCommandsBtn.classList.toggle('bg-zinc-700', !isDetails);
+  tabCommandsBtn.classList.toggle('text-zinc-100', !isDetails);
+}
+
+tabDetailsBtn.addEventListener('click', () => setActiveTab('details'));
+tabCommandsBtn.addEventListener('click', () => setActiveTab('commands'));
+
+function updateCommands(node) {
+  if (!commandsList) return;
+  const hash = node.hash || node.id;
+  const commands = [
+    { label: 'moveTo', cmd: `git switch --detach ${hash}` },
+    { label: 'delete', cmd: `git revert ${hash}` },
+    { label: 'diff with one before', cmd: `git diff ${hash}^ ${hash}` },
+    { label: 'diff with my position now', cmd: `git diff HEAD ${hash}` }
+  ];
+
+  commandsList.innerHTML = '';
+  commands.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'space-y-1';
+
+    const label = document.createElement('div');
+    label.className = 'text-xs text-zinc-500 uppercase tracking-wide';
+    label.textContent = item.label;
+
+    const code = document.createElement('code');
+    code.className = 'block text-xs text-zinc-200 bg-zinc-900 px-2 py-1 rounded break-all';
+    code.textContent = item.cmd;
+
+    row.appendChild(label);
+    row.appendChild(code);
+    commandsList.appendChild(row);
+  });
+}
 
 function findLatestNodeIndexForLane(lane) {
   for (let i = 0; i < graphData.nodes.length; i++) {
