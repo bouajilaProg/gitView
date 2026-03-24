@@ -11,60 +11,60 @@
   </style>
 </head>
 <body class="bg-zinc-900 text-zinc-100 font-mono">
-  <!-- Main Layout -->
-  <div class="flex h-dvh">
-    <!-- Canvas Container -->
-    <div class="flex-1 relative">
-      <canvas id="graph-canvas" class="block"></canvas>
-      
-      <!-- Controls Overlay -->
-      <div class="absolute top-4 left-4 bg-zinc-800/90 px-3 py-2 rounded-lg text-xs text-zinc-400 space-y-1">
-        <div>
-          <span>Scroll: Zoom</span>
-          <span class="mx-2">|</span>
-          <span>Drag: Pan</span>
-          <span class="mx-2">|</span>
-          <span>Click: Select</span>
-        </div>
-        <div class="text-zinc-500">
-          <span>R: Reset</span>
-          <span class="mx-2">|</span>
-          <span>M: Toggle messages</span>
-          <span class="mx-2">|</span>
-          <span>Esc: Close</span>
-        </div>
+  <!-- Fullscreen Canvas Container -->
+  <div class="h-dvh w-full relative">
+    <canvas id="graph-canvas" class="block absolute inset-0"></canvas>
+    
+    <!-- Controls Overlay -->
+    <div class="absolute top-4 left-4 bg-zinc-800/90 px-3 py-2 rounded-lg text-xs text-zinc-400 space-y-1 z-10">
+      <div>
+        <span>Scroll: Zoom</span>
+        <span class="mx-2">|</span>
+        <span>Drag: Pan</span>
+        <span class="mx-2">|</span>
+        <span>Click: Select</span>
       </div>
-
-      <!-- Toggle Button -->
-      <div class="absolute top-4 right-4 flex gap-2">
-        <button 
-          id="toggle-messages" 
-          class="bg-zinc-800/90 px-3 py-2 rounded-lg text-xs text-zinc-400 hover:bg-zinc-700"
-          aria-label="Toggle commit messages"
-        >
-          Messages: ON
-        </button>
-      </div>
-
-      <!-- Empty State -->
-      <div id="empty-state" class="absolute inset-0 flex items-center justify-center hidden">
-        <div class="text-center">
-          <p class="text-zinc-400 text-lg">No commits found</p>
-          <p class="text-zinc-500 text-sm mt-2">Make sure you're running this in a git repository</p>
-        </div>
-      </div>
-
-      <!-- Loading State -->
-      <div id="loading-state" class="absolute inset-0 flex items-center justify-center bg-zinc-900">
-        <div class="text-center">
-          <div class="size-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full mx-auto" style="animation: spin 1s linear infinite;"></div>
-          <p class="text-zinc-400 mt-4">Loading repository...</p>
-        </div>
+      <div class="text-zinc-500">
+        <span>R: Reset</span>
+        <span class="mx-2">|</span>
+        <span>M: Toggle messages</span>
+        <span class="mx-2">|</span>
+        <span>Esc: Close</span>
       </div>
     </div>
 
-    <!-- Detail Panel -->
-    <div id="detail-panel" class="w-80 bg-zinc-800 border-l border-zinc-700 flex flex-col translate-x-full" style="transition: transform 150ms ease-out;">
+    <!-- Toggle Button -->
+    <div class="absolute top-4 right-4 flex gap-2 z-10">
+      <button 
+        id="toggle-messages" 
+        class="bg-zinc-800/90 px-3 py-2 rounded-lg text-xs text-zinc-400 hover:bg-zinc-700"
+        aria-label="Toggle commit messages"
+      >
+        Messages: ON
+      </button>
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="absolute inset-0 flex items-center justify-center hidden z-10">
+      <div class="text-center">
+        <p class="text-zinc-400 text-lg">No commits found</p>
+        <p class="text-zinc-500 text-sm mt-2">Make sure you're running this in a git repository</p>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-state" class="absolute inset-0 flex items-center justify-center bg-zinc-900 z-10">
+      <div class="text-center">
+        <div class="size-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full mx-auto" style="animation: spin 1s linear infinite;"></div>
+        <p class="text-zinc-400 mt-4">Loading repository...</p>
+      </div>
+    </div>
+
+    <!-- Overlay backdrop (click to close) -->
+    <div id="panel-backdrop" class="fixed inset-0 bg-black/50 z-20 hidden" style="transition: opacity 150ms ease-out;"></div>
+
+    <!-- Detail Panel (overlay modal) -->
+    <div id="detail-panel" class="fixed top-0 right-0 h-dvh w-80 bg-zinc-800 border-l border-zinc-700 flex flex-col z-30 translate-x-full" style="transition: transform 150ms ease-out;">
       <!-- Header -->
       <div class="flex items-center justify-between p-4 border-b border-zinc-700">
         <h2 class="text-sm font-semibold text-zinc-300">Commit Details</h2>
@@ -159,6 +159,7 @@
 
     // UI Elements
     const detailPanel = document.getElementById('detail-panel');
+    const panelBackdrop = document.getElementById('panel-backdrop');
     const loadingState = document.getElementById('loading-state');
     const emptyState = document.getElementById('empty-state');
     const closeBtn = document.getElementById('close-panel');
@@ -166,9 +167,8 @@
 
     // Resize handler
     function resizeCanvas() {
-      const rect = canvas.parentElement.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
       render();
     }
 
@@ -213,11 +213,13 @@
     }
 
     // Get node position - HORIZONTAL layout
-    // X = commit index (time flows left to right)
+    // Oldest commits on RIGHT, newest on LEFT
+    // X = (total - index) * spacing (reversed)
     // Y = lane (branch)
     function getNodePosition(node, index) {
+      const totalNodes = graphData.nodes.length;
       return {
-        x: index * COLUMN_WIDTH,
+        x: (totalNodes - 1 - index) * COLUMN_WIDTH,
         y: node.lane * LANE_HEIGHT
       };
     }
@@ -418,7 +420,7 @@
       return 'just now';
     }
 
-    // Show detail panel
+    // Show detail panel (overlay)
     function showDetail(node) {
       selectedNode = node;
       
@@ -445,6 +447,7 @@
         filesContainer.appendChild(div);
       }
 
+      panelBackdrop.classList.remove('hidden');
       detailPanel.classList.remove('translate-x-full');
       render();
     }
@@ -453,21 +456,15 @@
     function hideDetail() {
       selectedNode = null;
       detailPanel.classList.add('translate-x-full');
+      panelBackdrop.classList.add('hidden');
       render();
     }
 
     // Event: Close panel button
     closeBtn.addEventListener('click', hideDetail);
 
-    // Event: Click outside panel to close
-    document.addEventListener('click', (e) => {
-      if (!detailPanel.classList.contains('translate-x-full') &&
-          !detailPanel.contains(e.target) &&
-          !canvas.contains(e.target) &&
-          e.target !== toggleMessagesBtn) {
-        hideDetail();
-      }
-    });
+    // Event: Click backdrop to close
+    panelBackdrop.addEventListener('click', hideDetail);
 
     // Event: Canvas click
     canvas.addEventListener('click', (e) => {
@@ -562,12 +559,13 @@
         return;
       }
 
-      // Navigation with arrow keys (now horizontal)
+      // Navigation with arrow keys (now horizontal, reversed direction)
       if (selectedNode && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
         const currentIndex = graphData.nodes.findIndex(n => n.id === selectedNode.id);
         let newIndex;
         
+        // Left = newer (lower index), Right = older (higher index)
         if (e.key === 'ArrowLeft') {
           newIndex = Math.max(0, currentIndex - 1);
         } else {
