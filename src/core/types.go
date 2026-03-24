@@ -11,13 +11,13 @@ type Node struct {
 	Date    string   `json:"date"`
 	Files   []string `json:"files"`
 	Lane    int      `json:"lane"`
-	Color   int      `json:"colorLane"`
 }
 
 // Edge represents a connection between commits
 type Edge struct {
 	Source string `json:"source"`
 	Target string `json:"target"`
+	Color  int    `json:"colorLane"`
 }
 
 // Graph represents the complete commit graph

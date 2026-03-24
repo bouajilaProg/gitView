@@ -1,5 +1,6 @@
 // Constants - HORIZONTAL layout
-const NODE_RADIUS = 20;
+const NODE_WIDTH = 36;
+const NODE_HEIGHT = 24;
 const LANE_HEIGHT = 80; // Vertical spacing between branches (lanes)
 const COLUMN_WIDTH = 120; // Horizontal spacing between commits
 const HIT_RADIUS = 25;
@@ -46,6 +47,7 @@ const tabCommandsBtn = document.getElementById('tab-commands');
 const detailContent = document.getElementById('detail-content');
 const commandsContent = document.getElementById('commands-content');
 const commandsList = document.getElementById('detail-commands');
+const copyHashBtn = document.getElementById('copy-hash');
 
 // Resize handler
 function resizeCanvas() {
@@ -128,15 +130,15 @@ function getLaneColor(lane) {
   return LANE_COLORS[lane % LANE_COLORS.length];
 }
 
-function getNodeColor(node) {
-  if (typeof node.colorLane === 'number') {
-    return getLaneColor(node.colorLane);
+function getEdgeColor(edge) {
+  if (typeof edge.colorLane === 'number') {
+    return getLaneColor(edge.colorLane);
   }
-  return getLaneColor(node.lane);
+  return getLaneColor(0);
 }
 
 // Draw horizontal line between two points with curves for lane changes
-function drawEdge(source, target, sourceIndex, targetIndex) {
+function drawEdge(edge, source, target, sourceIndex, targetIndex) {
   const start = getNodePosition(source, sourceIndex);
   const end = getNodePosition(target, targetIndex);
 
@@ -159,7 +161,7 @@ function drawEdge(source, target, sourceIndex, targetIndex) {
     );
   }
 
-  ctx.strokeStyle = getLaneColor(source.lane);
+  ctx.strokeStyle = getEdgeColor(edge);
   ctx.lineWidth = 3 * camera.scale;
   ctx.stroke();
 }
@@ -168,12 +170,13 @@ function drawEdge(source, target, sourceIndex, targetIndex) {
 function drawNode(node, index) {
   const pos = getNodePosition(node, index);
   const screen = worldToScreen(pos.x, pos.y);
-  const radius = NODE_RADIUS * camera.scale;
-  const color = getNodeColor(node);
+  const halfWidth = (NODE_WIDTH * camera.scale) / 2;
+  const halfHeight = (NODE_HEIGHT * camera.scale) / 2;
+  const color = getLaneColor(node.lane);
 
-  // Draw square
+  // Draw rectangle
   ctx.beginPath();
-  ctx.rect(screen.x - radius, screen.y - radius, radius * 2, radius * 2);
+  ctx.rect(screen.x - halfWidth, screen.y - halfHeight, halfWidth * 2, halfHeight * 2);
 
   if (selectedNode && selectedNode.id === node.id) {
     ctx.fillStyle = '#ffffff';
@@ -207,7 +210,7 @@ function drawNode(node, index) {
     ctx.font = `${Math.max(8, 9 * camera.scale)}px monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(truncated, screen.x, screen.y + radius + 8 * camera.scale);
+    ctx.fillText(truncated, screen.x, screen.y + halfHeight + 8 * camera.scale);
   }
 }
 
@@ -284,7 +287,7 @@ function render() {
     if (sourceIndex !== undefined && targetIndex !== undefined) {
       const source = graphData.nodes[sourceIndex];
       const target = graphData.nodes[targetIndex];
-      drawEdge(source, target, sourceIndex, targetIndex);
+      drawEdge(edge, source, target, sourceIndex, targetIndex);
     }
   });
 
@@ -303,7 +306,7 @@ function findNodeAt(screenX, screenY) {
     const pos = getNodePosition(node, i);
     const dx = world.x - pos.x;
     const dy = world.y - pos.y;
-    if (Math.abs(dx) <= HIT_RADIUS && Math.abs(dy) <= HIT_RADIUS) {
+    if (Math.abs(dx) <= NODE_WIDTH / 2 && Math.abs(dy) <= NODE_HEIGHT / 2) {
       return node;
     }
   }
@@ -336,6 +339,9 @@ function showDetail(node) {
 
   const fullHash = node.hash || node.id;
   document.getElementById('detail-hash').textContent = fullHash;
+  if (copyHashBtn) {
+    copyHashBtn.dataset.value = fullHash;
+  }
   document.getElementById('detail-message').textContent = node.message.trim();
   document.getElementById('detail-author').textContent = node.author;
   document.getElementById('detail-date').textContent = formatRelativeDate(node.date);
@@ -410,13 +416,42 @@ function updateCommands(node) {
     label.className = 'text-xs text-zinc-500 uppercase tracking-wide';
     label.textContent = item.label;
 
+    const commandRow = document.createElement('div');
+    commandRow.className = 'flex items-start gap-2';
+
     const code = document.createElement('code');
-    code.className = 'block text-xs text-zinc-200 bg-zinc-900 px-2 py-1 rounded break-all';
+    code.className = 'block text-xs text-zinc-200 bg-zinc-900 px-2 py-1 rounded break-all flex-1';
     code.textContent = item.cmd;
 
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button';
+    copyButton.className = 'text-xs text-zinc-300 px-2 py-1 rounded bg-zinc-700/80 hover:bg-zinc-600';
+    copyButton.textContent = 'Copy';
+    copyButton.addEventListener('click', () => copyText(item.cmd));
+
+    commandRow.appendChild(code);
+    commandRow.appendChild(copyButton);
+
     row.appendChild(label);
-    row.appendChild(code);
+    row.appendChild(commandRow);
     commandsList.appendChild(row);
+  });
+}
+
+function copyText(value) {
+  if (!value) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(value).catch(() => {
+      window.prompt('Copy to clipboard:', value);
+    });
+    return;
+  }
+  window.prompt('Copy to clipboard:', value);
+}
+
+if (copyHashBtn) {
+  copyHashBtn.addEventListener('click', () => {
+    copyText(copyHashBtn.dataset.value);
   });
 }
 
@@ -558,7 +593,7 @@ document.addEventListener('keydown', (e) => {
     if (targetIndex !== -1) {
       const targetNode = graphData.nodes[targetIndex];
       focusOnNode(targetNode, targetIndex);
-      showDetail(targetNode);
+      render();
     }
     return;
   }

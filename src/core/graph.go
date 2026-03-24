@@ -107,13 +107,6 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 		if c.Lane > maxLane {
 			maxLane = c.Lane
 		}
-		colorLane := c.Lane
-		if len(c.Parents) > 1 {
-			mergedParent := c.Parents[1]
-			if mergedCommit, exists := commits[mergedParent]; exists {
-				colorLane = mergedCommit.Lane
-			}
-		}
 		node := Node{
 			ID:      c.Hash[:7],
 			Hash:    c.Hash,
@@ -122,16 +115,20 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 			Date:    c.Date.Format(time.RFC3339),
 			Files:   c.Files,
 			Lane:    c.Lane,
-			Color:   colorLane,
 		}
 		graph.Nodes = append(graph.Nodes, node)
 
 		// Add edges to parents
-		for _, parent := range c.Parents {
-			if _, exists := commits[parent]; exists {
+		for index, parent := range c.Parents {
+			if parentCommit, exists := commits[parent]; exists {
+				colorLane := c.Lane
+				if index > 0 {
+					colorLane = parentCommit.Lane
+				}
 				graph.Edges = append(graph.Edges, Edge{
 					Source: c.Hash[:7],
 					Target: parent[:7],
+					Color:  colorLane,
 				})
 			}
 		}
