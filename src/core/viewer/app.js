@@ -122,6 +122,13 @@ function getLaneColor(lane) {
   return LANE_COLORS[lane % LANE_COLORS.length];
 }
 
+function getNodeColor(node) {
+  if (typeof node.colorLane === 'number') {
+    return getLaneColor(node.colorLane);
+  }
+  return getLaneColor(node.lane);
+}
+
 // Draw horizontal line between two points with curves for lane changes
 function drawEdge(source, target, sourceIndex, targetIndex) {
   const start = getNodePosition(source, sourceIndex);
@@ -156,11 +163,11 @@ function drawNode(node, index) {
   const pos = getNodePosition(node, index);
   const screen = worldToScreen(pos.x, pos.y);
   const radius = NODE_RADIUS * camera.scale;
-  const color = getLaneColor(node.lane);
+  const color = getNodeColor(node);
 
-  // Draw circle
+  // Draw square
   ctx.beginPath();
-  ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+  ctx.rect(screen.x - radius, screen.y - radius, radius * 2, radius * 2);
 
   if (selectedNode && selectedNode.id === node.id) {
     ctx.fillStyle = '#ffffff';
@@ -176,7 +183,7 @@ function drawNode(node, index) {
     ctx.stroke();
   }
 
-  // Draw hash inside circle
+  // Draw hash inside square
   if (camera.scale > 0.4) {
     const hashColor = selectedNode && selectedNode.id === node.id ? '#18181b' : '#ffffff';
     ctx.fillStyle = hashColor;
@@ -290,9 +297,7 @@ function findNodeAt(screenX, screenY) {
     const pos = getNodePosition(node, i);
     const dx = world.x - pos.x;
     const dy = world.y - pos.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    if (distance <= HIT_RADIUS) {
+    if (Math.abs(dx) <= HIT_RADIUS && Math.abs(dy) <= HIT_RADIUS) {
       return node;
     }
   }
@@ -323,7 +328,8 @@ function formatRelativeDate(dateStr) {
 function showDetail(node) {
   selectedNode = node;
 
-  document.getElementById('detail-hash').textContent = node.id;
+  const fullHash = node.hash || node.id;
+  document.getElementById('detail-hash').textContent = fullHash;
   document.getElementById('detail-message').textContent = node.message.trim();
   document.getElementById('detail-author').textContent = node.author;
   document.getElementById('detail-date').textContent = formatRelativeDate(node.date);
@@ -364,6 +370,21 @@ closeBtn.addEventListener('click', hideDetail);
 
 // Event: Click backdrop to close
 panelBackdrop.addEventListener('click', hideDetail);
+
+function findLatestNodeIndexForLane(lane) {
+  for (let i = 0; i < graphData.nodes.length; i++) {
+    if (graphData.nodes[i].lane === lane) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function focusOnNode(node, index) {
+  const pos = getNodePosition(node, index);
+  camera.x = canvas.width / (2 * camera.scale) - pos.x;
+  camera.y = canvas.height / (2 * camera.scale) - pos.y;
+}
 
 // Event: Canvas click
 canvas.addEventListener('click', (e) => {
@@ -478,10 +499,19 @@ document.addEventListener('keydown', (e) => {
 
   // Reset view with 'r' key
   if (e.key === 'r' && !e.metaKey && !e.ctrlKey) {
-    camera.x = 50;
-    camera.y = 100;
-    camera.scale = 1;
-    render();
+    let targetIndex = -1;
+    if (selectedNode) {
+      targetIndex = findLatestNodeIndexForLane(selectedNode.lane);
+    }
+    if (targetIndex === -1 && graphData.nodes.length > 0) {
+      targetIndex = 0;
+    }
+    if (targetIndex !== -1) {
+      const targetNode = graphData.nodes[targetIndex];
+      focusOnNode(targetNode, targetIndex);
+      showDetail(targetNode);
+    }
+    return;
   }
 
   // Zoom with +/- keys
