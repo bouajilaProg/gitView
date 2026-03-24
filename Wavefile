@@ -1,0 +1,13 @@
+[project]
+name = "gitView"
+version = "0.1.0"
+owner = "bouajilaProg"
+category = "personal"
+tags = ["dev-tools","git"]
+
+[flow]
+dev = {
+    cmd= "go build",
+    on_success= "./gitView",
+    watch=["*.go","assets/*","src/*"]
+  }
