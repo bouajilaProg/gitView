@@ -11,3 +11,9 @@ tags = ["dev-tools","git"]
      on_success= "./gitView",
      watch=["*.go","assets/*","src/*"]
    }
+  build = {
+     cmd= "go build -o gitView ./src/core"
+   }
+  test = {
+     cmd= "go test ./src/core"
+   }
