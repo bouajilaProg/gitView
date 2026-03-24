@@ -38,6 +38,11 @@ Then open http://localhost:6060 in your browser.
 - **Drag**: Pan the canvas
 - **Click**: Select a commit to view details
 
+## Project Structure
+
+- `src/index.html` is the embedded frontend source
+- `assets/` is reserved for static assets during development
+
 ## Tech Stack
 
 - **Backend**: Go with [go-git](https://github.com/go-git/go-git)
