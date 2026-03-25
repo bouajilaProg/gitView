@@ -7,19 +7,22 @@ tags = ["dev-tools","git"]
 
 [flow]
   dev = {
-     cmd= "./tools/tailwindcss -c tailwind.config.js -i src/core/viewer/style/tailwind.css -o src/core/viewer/style/output.css && go build -o gitView ./src/core",
+     cmd= "./tools/tailwindcss -c tailwind.config.js -i src/viewer/style/tailwind.css -o src/viewer/style/output.css && go build -o gitView ./src",
      on_success= "./gitView",
-     watch=["*.go","assets/*","src/**/*","tailwind.config.js","src/core/viewer/style/tailwind.css"]
+     watch=["*.go","assets/*","src/**/*","tailwind.config.js","src/viewer/style/tailwind.css"]
    }
   build = {
-     cmd= "./tools/tailwindcss -c tailwind.config.js -i src/core/viewer/style/tailwind.css -o src/core/viewer/style/output.css --minify && go build -o gitView ./src/core"
+     cmd= "./tools/tailwindcss -c tailwind.config.js -i src/viewer/style/tailwind.css -o src/viewer/style/output.css --minify && go build -o gitView ./src"
    }
   test = {
-     cmd= "go test ./src/core"
+     cmd= "go test ./src"
    }
   setup_linux = {
      cmd= "sh tools/setup-tailwind-linux.sh"
    }
   setup_windows = {
      cmd= "powershell -ExecutionPolicy Bypass -File tools/setup-tailwind-windows.ps1"
+   }
+  ci = {
+     cmd= "./tools/tailwindcss -c tailwind.config.js -i src/viewer/style/tailwind.css -o src/viewer/style/output.css --minify && go test ./src && go build -o gitView ./src"
    }

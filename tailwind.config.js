@@ -1,6 +1,6 @@
 module.exports = {
   darkMode: 'class',
-  content: ['./src/core/viewer/**/*.{html,js}'],
+  content: ['./src/viewer/**/*.{html,js}'],
   theme: {
     extend: {
       colors: {
