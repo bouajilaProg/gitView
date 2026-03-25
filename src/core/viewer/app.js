@@ -47,6 +47,7 @@ const detailContent = document.getElementById('detail-content');
 const commandsContent = document.getElementById('commands-content');
 const commandsList = document.getElementById('detail-commands');
 const copyHashBtn = document.getElementById('copy-hash');
+const filesCountSpan = document.getElementById('files-count');
 
 // Resize handler
 function resizeCanvas() {
@@ -57,8 +58,14 @@ function resizeCanvas() {
 
 // Initialize
 window.addEventListener('resize', resizeCanvas);
+window.addEventListener('theme-changed', render);
 resizeCanvas();
 setActiveTab('details');
+
+// Theme variable helper
+function getThemeVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
 
 // Toggle messages
 toggleMessagesBtn.addEventListener('click', () => {
@@ -97,9 +104,6 @@ async function fetchGraph() {
 }
 
 // Get node position - HORIZONTAL layout
-// Oldest commits on RIGHT, newest on LEFT
-// X = (total - index) * spacing (reversed)
-// Y = lane (branch)
 function getNodePosition(node, index) {
   const totalNodes = graphData.nodes.length;
   return {
@@ -124,7 +128,7 @@ function screenToWorld(x, y) {
   };
 }
 
-// Get lane color - consistent per branch
+// Get lane color
 function getLaneColor(lane) {
   return LANE_COLORS[lane % LANE_COLORS.length];
 }
@@ -148,10 +152,8 @@ function drawEdge(edge, source, target, sourceIndex, targetIndex) {
   ctx.moveTo(startScreen.x, startScreen.y);
 
   if (start.y === end.y) {
-    // Same lane - straight horizontal line
     ctx.lineTo(endScreen.x, endScreen.y);
   } else {
-    // Different lanes - use bezier curve
     const midX = (startScreen.x + endScreen.x) / 2;
     ctx.bezierCurveTo(
       midX, startScreen.y,
@@ -165,19 +167,26 @@ function drawEdge(edge, source, target, sourceIndex, targetIndex) {
   ctx.stroke();
 }
 
-// Draw commit node with hash inside
+// Draw commit node
 function drawNode(node, index) {
   const pos = getNodePosition(node, index);
   const screen = worldToScreen(pos.x, pos.y);
   const radius = NODE_RADIUS * camera.scale;
   const color = getLaneColor(node.lane);
+  
+  const bgTheme = getThemeVar('--bg');
+  const textTheme = getThemeVar('--text');
+  const panelTheme = getThemeVar('--panel');
+  const dimTheme = getThemeVar('--dim');
+  const hashTextTheme = getThemeVar('--hash-text');
+  const hashBgTheme = getThemeVar('--hash-bg');
 
   // Draw circle
   ctx.beginPath();
   ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
 
   if (selectedNode && selectedNode.id === node.id) {
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = textTheme;
     ctx.strokeStyle = color;
     ctx.lineWidth = 4 * camera.scale;
     ctx.fill();
@@ -185,14 +194,14 @@ function drawNode(node, index) {
   } else {
     ctx.fillStyle = color;
     ctx.fill();
-    ctx.strokeStyle = '#18181b';
+    ctx.strokeStyle = bgTheme;
     ctx.lineWidth = 2 * camera.scale;
     ctx.stroke();
   }
 
   // Draw hash inside circle
   if (camera.scale > 0.4) {
-    const hashColor = selectedNode && selectedNode.id === node.id ? '#18181b' : '#ffffff';
+    const hashColor = selectedNode && selectedNode.id === node.id ? bgTheme : hashTextTheme;
     ctx.fillStyle = hashColor;
     ctx.font = `bold ${Math.max(8, 10 * camera.scale)}px monospace`;
     ctx.textAlign = 'center';
@@ -204,7 +213,7 @@ function drawNode(node, index) {
   if (showMessages && camera.scale > 0.5) {
     const message = node.message.split('\n')[0];
     const truncated = message.length > 20 ? message.substring(0, 20) + '...' : message;
-    ctx.fillStyle = '#a1a1aa';
+    ctx.fillStyle = dimTheme;
     ctx.font = `${Math.max(8, 9 * camera.scale)}px monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -222,7 +231,7 @@ function drawNode(node, index) {
     const tagX = screen.x;
     const tagY = screen.y - radius - 12 * camera.scale;
 
-    ctx.fillStyle = '#16161e'; // bg-tokyo-panel
+    ctx.fillStyle = panelTheme;
     ctx.strokeStyle = color;
     ctx.lineWidth = 1 * camera.scale;
     ctx.beginPath();
@@ -246,18 +255,34 @@ function getLaneList() {
   return lanes.map(index => ({ index, name: '' }));
 }
 
-// Draw branch lane lines (horizontal guidelines)
+// Draw branch lane lines (horizontal guidelines bounded to branch span)
 function drawLaneLines() {
   if (graphData.nodes.length === 0) return;
 
   const lanes = getLaneList();
-  const maxIndex = graphData.nodes.length - 1;
-  const startX = -50;
-  const endX = maxIndex * COLUMN_WIDTH + 50;
   const labelPadding = 12;
 
+  // Calculate minX and maxX for each lane based on nodes
+  const laneBounds = {};
+  graphData.nodes.forEach((node, index) => {
+    const pos = getNodePosition(node, index);
+    if (!laneBounds[node.lane]) {
+      laneBounds[node.lane] = { minX: pos.x, maxX: pos.x };
+    } else {
+      laneBounds[node.lane].minX = Math.min(laneBounds[node.lane].minX, pos.x);
+      laneBounds[node.lane].maxX = Math.max(laneBounds[node.lane].maxX, pos.x);
+    }
+  });
+
   lanes.forEach(lane => {
+    const bounds = laneBounds[lane.index];
+    if (!bounds) return;
+
+    // Extend line slightly past the nodes
+    const startX = bounds.minX - 50;
+    const endX = bounds.maxX + 50;
     const y = lane.index * LANE_HEIGHT;
+    
     const startScreen = worldToScreen(startX, y);
     const endScreen = worldToScreen(endX, y);
 
@@ -293,16 +318,13 @@ function render() {
 
   if (graphData.nodes.length === 0) return;
 
-  // Build node index map
   const nodeIndexMap = {};
   graphData.nodes.forEach((node, i) => {
     nodeIndexMap[node.id] = i;
   });
 
-  // Draw lane guidelines first
   drawLaneLines();
 
-  // Draw edges
   graphData.edges.forEach(edge => {
     const sourceIndex = nodeIndexMap[edge.source];
     const targetIndex = nodeIndexMap[edge.target];
@@ -314,13 +336,12 @@ function render() {
     }
   });
 
-  // Draw nodes on top
   graphData.nodes.forEach((node, index) => {
     drawNode(node, index);
   });
 }
 
-// Hit detection - find node at screen coordinates
+// Hit detection
 function findNodeAt(screenX, screenY) {
   const world = screenToWorld(screenX, screenY);
 
@@ -357,7 +378,7 @@ function formatRelativeDate(dateStr) {
   return 'just now';
 }
 
-// Show detail panel (overlay)
+// Show detail panel
 function showDetail(node) {
   selectedNode = node;
 
@@ -372,23 +393,27 @@ function showDetail(node) {
 
   const filesContainer = document.getElementById('detail-files');
   filesContainer.innerHTML = '';
+  
+  if (filesCountSpan) {
+    filesCountSpan.textContent = node.files ? node.files.length : '0';
+  }
 
   if (node.files && node.files.length > 0) {
     node.files.forEach(file => {
       const div = document.createElement('div');
-      div.className = 'flex items-center gap-2 text-xs py-1 px-2 bg-tokyo-bg rounded truncate';
+      div.className = 'flex items-center gap-2 text-xs py-1.5 px-2.5 hover:bg-theme-border/30 rounded-md transition-colors truncate';
       
       const statusSpan = document.createElement('span');
-      let statusColor = 'text-tokyo-blue';
-      if (file.status === 'A') statusColor = 'text-tokyo-green';
-      if (file.status === 'D') statusColor = 'text-tokyo-red';
-      if (file.status === 'M') statusColor = 'text-tokyo-yellow';
+      let statusColor = 'text-theme-blue';
+      if (file.status === 'A') statusColor = 'text-theme-green';
+      if (file.status === 'D') statusColor = 'text-theme-red';
+      if (file.status === 'M') statusColor = 'text-theme-yellow';
       
-      statusSpan.className = `font-bold ${statusColor}`;
+      statusSpan.className = `font-bold ${statusColor} w-4 text-center`;
       statusSpan.textContent = file.status;
       
       const nameSpan = document.createElement('span');
-      nameSpan.className = 'text-tokyo-text truncate';
+      nameSpan.className = 'text-theme-text truncate flex-1';
       nameSpan.textContent = file.name;
       nameSpan.title = file.name;
       
@@ -398,7 +423,7 @@ function showDetail(node) {
     });
   } else {
     const div = document.createElement('div');
-    div.className = 'text-xs text-tokyo-dim italic';
+    div.className = 'text-xs text-theme-dim italic p-2';
     div.textContent = 'No files changed';
     filesContainer.appendChild(div);
   }
@@ -417,24 +442,21 @@ function hideDetail() {
   render();
 }
 
-// Event: Close panel button
 closeBtn.addEventListener('click', hideDetail);
-
-// Event: Click backdrop to close
 panelBackdrop.addEventListener('click', hideDetail);
 
 function setActiveTab(tab) {
   const isDetails = tab === 'details';
   detailContent.classList.toggle('hidden', !isDetails);
   commandsContent.classList.toggle('hidden', isDetails);
-  tabDetailsBtn.classList.toggle('bg-tokyo-blue', isDetails);
-  tabDetailsBtn.classList.toggle('text-tokyo-bg', isDetails);
-  tabDetailsBtn.classList.toggle('text-tokyo-muted', !isDetails);
+  tabDetailsBtn.classList.toggle('bg-theme-blue', isDetails);
+  tabDetailsBtn.classList.toggle('text-white', isDetails);
+  tabDetailsBtn.classList.toggle('text-theme-muted', !isDetails);
   tabDetailsBtn.classList.toggle('bg-transparent', !isDetails);
   
-  tabCommandsBtn.classList.toggle('bg-tokyo-blue', !isDetails);
-  tabCommandsBtn.classList.toggle('text-tokyo-bg', !isDetails);
-  tabCommandsBtn.classList.toggle('text-tokyo-muted', isDetails);
+  tabCommandsBtn.classList.toggle('bg-theme-blue', !isDetails);
+  tabCommandsBtn.classList.toggle('text-white', !isDetails);
+  tabCommandsBtn.classList.toggle('text-theme-muted', isDetails);
   tabCommandsBtn.classList.toggle('bg-transparent', isDetails);
 }
 
@@ -454,25 +476,25 @@ function updateCommands(node) {
   commandsList.innerHTML = '';
   commands.forEach(item => {
     const row = document.createElement('div');
-    row.className = 'space-y-1';
+    row.className = 'space-y-1.5';
 
     const label = document.createElement('div');
-    label.className = 'text-xs text-tokyo-dim uppercase tracking-wide';
+    label.className = 'text-[10px] font-bold text-theme-dim uppercase tracking-wider';
     label.textContent = item.label;
 
     const commandRow = document.createElement('div');
-    commandRow.className = 'flex items-start gap-2';
+    commandRow.className = 'flex items-stretch gap-2';
 
     const code = document.createElement('code');
-    code.className = 'block text-xs text-tokyo-text bg-tokyo-bg px-2 py-1 rounded break-all flex-1 border border-tokyo-border';
+    code.className = 'block text-xs text-theme-text bg-theme-bg px-2.5 py-1.5 rounded-md break-all flex-1 border border-theme-border/50 shadow-sm';
     code.textContent = item.cmd;
 
     const copyButton = document.createElement('button');
     copyButton.type = 'button';
-    copyButton.className = 'size-7 inline-flex items-center justify-center rounded hover:bg-tokyo-border/80 text-tokyo-muted flex-shrink-0';
+    copyButton.className = 'w-8 inline-flex items-center justify-center rounded-md bg-theme-bg border border-theme-border/50 hover:bg-theme-border text-theme-muted flex-shrink-0 transition-colors shadow-sm';
     copyButton.setAttribute('aria-label', `Copy ${item.label} command`);
     copyButton.innerHTML = `
-      <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect x="9" y="9" width="13" height="13" rx="2" />
         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
@@ -510,17 +532,14 @@ function findLatestNodeIndexForBranch(startNode) {
   if (!startNode) return -1;
   const targetId = startNode.hash || startNode.id;
   
-  // Find all children maps
   const childrenMap = {};
   graphData.edges.forEach(e => {
       if (!childrenMap[e.target]) childrenMap[e.target] = [];
       childrenMap[e.target].push(e.source);
   });
 
-  // Simple BFS up to find the nearest branch tip
   const queue = [targetId];
   const visited = new Set([targetId]);
-  let bestNode = null;
   let bestIndex = Infinity;
 
   while(queue.length > 0) {
@@ -533,7 +552,6 @@ function findLatestNodeIndexForBranch(startNode) {
       if (currNode.refs && currNode.refs.length > 0) {
           if (currIdx < bestIndex) {
               bestIndex = currIdx;
-              bestNode = currNode;
           }
       }
 
@@ -546,7 +564,6 @@ function findLatestNodeIndexForBranch(startNode) {
       }
   }
 
-  // Fallback to latest in lane if no branch tip found
   if (bestIndex === Infinity) {
     for (let i = 0; i < graphData.nodes.length; i++) {
       if (graphData.nodes[i].lane === startNode.lane) {
@@ -564,7 +581,6 @@ function focusOnNode(node, index) {
   camera.y = canvas.height / (2 * camera.scale) - pos.y;
 }
 
-// Event: Canvas click
 canvas.addEventListener('click', (e) => {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
@@ -576,12 +592,10 @@ canvas.addEventListener('click', (e) => {
   }
 });
 
-// Pan state
 let isPanning = false;
 let panStartX = 0;
 let panStartY = 0;
 
-// Event: Mouse down (start pan)
 canvas.addEventListener('mousedown', (e) => {
   isPanning = true;
   panStartX = e.clientX;
@@ -589,7 +603,6 @@ canvas.addEventListener('mousedown', (e) => {
   canvas.style.cursor = 'grabbing';
 });
 
-// Event: Mouse move (pan)
 canvas.addEventListener('mousemove', (e) => {
   if (!isPanning) return;
 
@@ -605,7 +618,6 @@ canvas.addEventListener('mousemove', (e) => {
   render();
 });
 
-// Event: Mouse up (end pan)
 canvas.addEventListener('mouseup', () => {
   isPanning = false;
   canvas.style.cursor = 'default';
@@ -616,7 +628,6 @@ canvas.addEventListener('mouseleave', () => {
   canvas.style.cursor = 'default';
 });
 
-// Event: Wheel (zoom)
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
 
@@ -624,32 +635,25 @@ canvas.addEventListener('wheel', (e) => {
   const mouseX = e.clientX - rect.left;
   const mouseY = e.clientY - rect.top;
 
-  // Get world position before zoom
   const worldBefore = screenToWorld(mouseX, mouseY);
 
-  // Apply zoom
   const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
   camera.scale = Math.min(camera.maxScale, Math.max(camera.minScale, camera.scale * zoomFactor));
 
-  // Get world position after zoom
   const worldAfter = screenToWorld(mouseX, mouseY);
 
-  // Adjust camera to keep mouse position stable
   camera.x += worldAfter.x - worldBefore.x;
   camera.y += worldAfter.y - worldBefore.y;
 
   render();
 }, { passive: false });
 
-// Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
-  // Escape to close panel
   if (e.key === 'Escape') {
     hideDetail();
     return;
   }
 
-  // M to toggle messages
   if (e.key === 'm' || e.key === 'M') {
     showMessages = !showMessages;
     toggleMessagesBtn.textContent = `Messages: ${showMessages ? 'ON' : 'OFF'}`;
@@ -657,13 +661,11 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  // Navigation with arrow keys (now horizontal, reversed direction)
   if (selectedNode && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
     e.preventDefault();
     const currentIndex = graphData.nodes.findIndex(n => n.id === selectedNode.id);
     let newIndex;
 
-    // Left = newer (lower index), Right = older (higher index)
     if (e.key === 'ArrowLeft') {
       newIndex = Math.max(0, currentIndex - 1);
     } else {
@@ -675,7 +677,6 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
-  // Reset view with 'r' key
   if (e.key === 'r' && !e.metaKey && !e.ctrlKey) {
     let targetIndex = -1;
     if (selectedNode) {
@@ -692,7 +693,6 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  // Zoom with +/- keys
   if (e.key === '=' || e.key === '+') {
     camera.scale = Math.min(camera.maxScale, camera.scale * 1.2);
     render();
@@ -703,5 +703,4 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Start
 fetchGraph();

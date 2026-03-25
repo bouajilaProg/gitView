@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 
 <head>
   <meta charset="UTF-8">
@@ -14,21 +14,22 @@
   <script src="/app.js" defer></script>
 </head>
 
-<body class="bg-tokyo-bg text-tokyo-text font-mono">
+<body class="bg-theme-bg text-theme-text font-mono transition-colors duration-200">
   <!-- Fullscreen Canvas Container -->
   <div class="h-dvh w-full relative">
     <canvas id="graph-canvas" class="block absolute inset-0"></canvas>
 
     <!-- Controls Overlay -->
-    <div class="absolute top-4 left-4 bg-tokyo-panel/90 px-3 py-2 rounded-lg text-xs text-tokyo-muted space-y-1 z-10 border border-tokyo-border">
+    <div
+      class="absolute top-4 left-4 bg-theme-panel/90 px-3 py-2 rounded-lg text-xs text-theme-muted space-y-1 z-10 border border-theme-border shadow-sm backdrop-blur-sm">
       <div>
         <span>Scroll: Zoom</span>
-        <span class="mx-2">|</span>
+        <span class="mx-2 text-theme-dim">|</span>
         <span>Drag: Pan</span>
-        <span class="mx-2">|</span>
+        <span class="mx-2 text-theme-dim">|</span>
         <span>Click: Select</span>
       </div>
-      <div class="text-tokyo-dim">
+      <div class="text-theme-dim">
         <span>R: Latest on branch</span>
         <span class="mx-2">|</span>
         <span>M: Toggle messages</span>
@@ -37,199 +38,123 @@
       </div>
     </div>
 
-    <!-- Toggle Button -->
+    <!-- Toggle Buttons -->
     <div class="absolute top-4 right-4 flex gap-2 z-10">
-      <button id="toggle-messages" class="bg-tokyo-panel/90 px-3 py-2 rounded-lg text-xs text-tokyo-muted hover:bg-tokyo-border border border-tokyo-border"
+      <button id="toggle-theme"
+        class="bg-theme-panel/90 p-2 rounded-lg text-theme-muted hover:bg-theme-border border border-theme-border transition-colors shadow-sm backdrop-blur-sm"
+        aria-label="Toggle theme">
+        <i data-lucide="sun" class="size-4 hidden dark:block"></i>
+        <i data-lucide="moon" class="size-4 block dark:hidden"></i>
+      </button>
+      <button id="toggle-messages"
+        class="bg-theme-panel/90 px-3 py-2 rounded-lg text-xs text-theme-muted hover:bg-theme-border border border-theme-border transition-colors shadow-sm backdrop-blur-sm font-semibold"
         aria-label="Toggle commit messages">
         Messages: ON
       </button>
     </div>
 
     <!-- Empty State -->
-    <div id="empty-state" class="absolute inset-0 flex items-center justify-center hidden z-10">
-      <div class="text-center">
-        <p class="text-tokyo-muted text-lg">No commits found</p>
-        <p class="text-tokyo-dim text-sm mt-2">Make sure you're running this in a git repository</p>
+    <div id="empty-state"
+      class="absolute inset-0 flex items-center justify-center hidden z-10 bg-theme-bg/80 backdrop-blur-sm">
+      <div class="text-center bg-theme-panel p-8 rounded-xl border border-theme-border shadow-lg">
+        <i data-lucide="git-branch" class="size-12 mx-auto text-theme-dim mb-4"></i>
+        <p class="text-theme-text font-semibold text-lg">No commits found</p>
+        <p class="text-theme-muted text-sm mt-2 max-w-xs">Make sure you're running this in a valid git repository with
+          at least one commit.</p>
       </div>
     </div>
 
     <!-- Loading State -->
-    <div id="loading-state" class="absolute inset-0 flex items-center justify-center bg-tokyo-bg z-10">
+    <div id="loading-state" class="absolute inset-0 flex items-center justify-center bg-theme-bg z-20">
       <div class="text-center">
-        <div class="size-8 border-2 border-tokyo-border border-t-tokyo-blue rounded-full mx-auto"
-          style="animation: spin 1s linear infinite;"></div>
-        <p class="text-tokyo-muted mt-4">Loading repository...</p>
+        <div class="size-8 border-2 border-theme-border border-t-theme-blue rounded-full mx-auto spin"></div>
+        <p class="text-theme-muted mt-4 font-medium animate-pulse">Loading repository...</p>
       </div>
     </div>
 
     <!-- Overlay backdrop (click to close) -->
-    <div id="panel-backdrop" class="fixed inset-0 bg-black/50 z-20 hidden" style="transition: opacity 150ms ease-out;">
+    <div id="panel-backdrop" class="fixed inset-0 bg-black/50 z-20 hidden backdrop-blur-sm fade">
     </div>
 
     <!-- Detail Panel (overlay modal) -->
     <div id="detail-panel"
-      class="fixed top-0 right-0 h-dvh w-96 bg-tokyo-panel border-l border-tokyo-border flex flex-col z-30 translate-x-full shadow-2xl"
-      style="transition: transform 150ms ease-out;">
+      class="fixed top-0 right-0 h-dvh w-96 bg-theme-panel border-l border-theme-border flex flex-col z-30 translate-x-full shadow-2xl transition-transform duration-200 ease-out">
       <!-- Header -->
-      <div class="flex items-center justify-between p-4 border-b border-tokyo-border">
-        <h2 class="text-sm font-semibold text-tokyo-text">Commit Details</h2>
-        <button id="close-panel" class="size-6 flex items-center justify-center rounded hover:bg-tokyo-border text-tokyo-muted"
+      <div class="flex items-center justify-between p-4 border-b border-theme-border">
+        <h2 class="text-sm font-semibold text-theme-text flex items-center gap-2">
+          <i data-lucide="git-commit-horizontal" class="size-4 text-theme-blue"></i>
+          Commit Details
+        </h2>
+        <button id="close-panel"
+          class="size-7 flex items-center justify-center rounded hover:bg-theme-border text-theme-muted transition-colors"
           aria-label="Close panel">
           <i data-lucide="x" class="size-4"></i>
         </button>
       </div>
 
       <!-- Tabs -->
-      <div class="flex gap-2 px-4 pt-3">
+      <div class="flex gap-1 px-4 pt-3 border-b border-theme-border/50 pb-2">
         <button id="tab-details"
-          class="px-2 py-1 text-xs rounded bg-tokyo-blue text-tokyo-bg font-semibold">Details</button>
+          class="px-3 py-1.5 text-xs rounded-md bg-theme-blue text-white font-semibold transition-colors">Details</button>
         <button id="tab-commands"
-          class="px-2 py-1 text-xs rounded text-tokyo-muted hover:text-tokyo-text hover:bg-tokyo-border/50">Commands</button>
+          class="px-3 py-1.5 text-xs rounded-md text-theme-muted hover:text-theme-text hover:bg-theme-border/50 font-medium transition-colors">Commands</button>
       </div>
 
       <!-- Content -->
       <div class="flex-1 overflow-y-auto p-4">
-        <div id="detail-content" class="space-y-4">
+        <div id="detail-content" class="space-y-5">
           <!-- Commit Hash -->
           <div>
-            <div class="flex items-center justify-between">
-              <span class="text-xs text-tokyo-dim uppercase tracking-wide">Hash</span>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-[10px] font-bold text-theme-dim uppercase tracking-wider">Hash</span>
               <button id="copy-hash"
-                class="size-7 inline-flex items-center justify-center rounded hover:bg-tokyo-border/80 text-tokyo-muted flex-shrink-0"
+                class="size-7 inline-flex items-center justify-center rounded hover:bg-theme-border text-theme-muted flex-shrink-0 transition-colors"
                 type="button" aria-label="Copy hash">
-                <i data-lucide="copy" class="size-4"></i>
+                <i data-lucide="copy" class="size-3.5"></i>
               </button>
             </div>
-            <p id="detail-hash" class="text-tokyo-yellow font-mono text-sm mt-1 break-all"></p>
+            <p id="detail-hash"
+              class="text-theme-yellow font-mono text-xs bg-theme-bg p-2 rounded border border-theme-border/50 break-all">
+            </p>
           </div>
 
           <!-- Message -->
           <div>
-            <span class="text-xs text-tokyo-dim uppercase tracking-wide">Message</span>
-            <p id="detail-message" class="text-tokyo-text text-sm mt-1 whitespace-pre-wrap"></p>
+            <span class="text-[10px] font-bold text-theme-dim uppercase tracking-wider mb-1.5 block">Message</span>
+            <p id="detail-message" class="text-theme-text text-sm whitespace-pre-wrap leading-relaxed"></p>
           </div>
 
           <!-- Author -->
           <div>
-            <span class="text-xs text-tokyo-dim uppercase tracking-wide">Author</span>
-            <p id="detail-author" class="text-tokyo-blue text-sm mt-1"></p>
+            <span class="text-[10px] font-bold text-theme-dim uppercase tracking-wider mb-1.5 block">Author</span>
+            <div class="flex items-center gap-2">
+              <div class="size-6 rounded-full bg-theme-blue/20 flex items-center justify-center">
+                <i data-lucide="user" class="size-3 text-theme-blue"></i>
+              </div>
+              <p id="detail-author" class="text-theme-blue text-sm font-medium"></p>
+            </div>
           </div>
 
           <!-- Date -->
           <div>
-            <span class="text-xs text-tokyo-dim uppercase tracking-wide">Date</span>
-            <p id="detail-date" class="text-tokyo-muted text-sm mt-1"></p>
+            <span class="text-[10px] font-bold text-theme-dim uppercase tracking-wider mb-1.5 block">Date</span>
+            <div class="flex items-center gap-2">
+              <i data-lucide="clock" class="size-3.5 text-theme-muted"></i>
+              <p id="detail-date" class="text-theme-muted text-sm"></p>
+            </div>
           </div>
 
           <!-- Files Changed -->
           <div>
-            <span class="text-xs text-tokyo-dim uppercase tracking-wide">Files Changed</span>
-            <div id="detail-files" class="mt-2 max-h-64 overflow-y-auto space-y-1"></div>
-          </div>
-        </div>
-
-        <div id="commands-content" class="space-y-4 hidden">
-          <div id="detail-commands" class="space-y-4"></div>
-        </div>
-      </div>
-    </div>
-      <div class="text-zinc-500">
-        <span>R: Latest on lane</span>
-        <span class="mx-2">|</span>
-        <span>M: Toggle messages</span>
-        <span class="mx-2">|</span>
-        <span>Esc: Close</span>
-      </div>
-    </div>
-
-    <!-- Toggle Button -->
-    <div class="absolute top-4 right-4 flex gap-2 z-10">
-      <button id="toggle-messages" class="bg-zinc-800/90 px-3 py-2 rounded-lg text-xs text-zinc-400 hover:bg-zinc-700"
-        aria-label="Toggle commit messages">
-        Messages: ON
-      </button>
-    </div>
-
-    <!-- Empty State -->
-    <div id="empty-state" class="absolute inset-0 flex items-center justify-center hidden z-10">
-      <div class="text-center">
-        <p class="text-zinc-400 text-lg">No commits found</p>
-        <p class="text-zinc-500 text-sm mt-2">Make sure you're running this in a git repository</p>
-      </div>
-    </div>
-
-    <!-- Loading State -->
-    <div id="loading-state" class="absolute inset-0 flex items-center justify-center bg-zinc-900 z-10">
-      <div class="text-center">
-        <div class="size-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full mx-auto"
-          style="animation: spin 1s linear infinite;"></div>
-        <p class="text-zinc-400 mt-4">Loading repository...</p>
-      </div>
-    </div>
-
-    <!-- Overlay backdrop (click to close) -->
-    <div id="panel-backdrop" class="fixed inset-0 bg-black/50 z-20 hidden" style="transition: opacity 150ms ease-out;">
-    </div>
-
-    <!-- Detail Panel (overlay modal) -->
-    <div id="detail-panel"
-      class="fixed top-0 right-0 h-dvh w-96 bg-zinc-800 border-l border-zinc-700 flex flex-col z-30 translate-x-full"
-      style="transition: transform 150ms ease-out;">
-      <!-- Header -->
-      <div class="flex items-center justify-between p-4 border-b border-zinc-700">
-        <h2 class="text-sm font-semibold text-zinc-300">Commit Details</h2>
-        <button id="close-panel" class="size-6 flex items-center justify-center rounded hover:bg-zinc-700 text-zinc-400"
-          aria-label="Close panel">
-          <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <!-- Tabs -->
-      <div class="flex gap-2 px-4 pt-3">
-        <button id="tab-details"
-          class="px-2 py-1 text-xs rounded bg-zinc-700 text-zinc-100">Details</button>
-        <button id="tab-commands"
-          class="px-2 py-1 text-xs rounded text-zinc-400 hover:text-zinc-200">Commands</button>
-      </div>
-
-      <!-- Content -->
-      <div class="flex-1 overflow-y-auto p-4">
-        <div id="detail-content" class="space-y-4">
-          <!-- Commit Hash -->
-          <div>
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-zinc-500 uppercase tracking-wide">Hash</span>
-            <button id="copy-hash"
-              class="text-xs text-zinc-300 px-2 py-1 rounded bg-zinc-700/80 hover:bg-zinc-600"
-              type="button">Copy</button>
-          </div>
-          <p id="detail-hash" class="text-amber-400 font-mono text-sm mt-1 break-all"></p>
-          </div>
-
-          <!-- Message -->
-          <div>
-            <span class="text-xs text-zinc-500 uppercase tracking-wide">Message</span>
-            <p id="detail-message" class="text-zinc-200 text-sm mt-1 whitespace-pre-wrap"></p>
-          </div>
-
-          <!-- Author -->
-          <div>
-            <span class="text-xs text-zinc-500 uppercase tracking-wide">Author</span>
-            <p id="detail-author" class="text-zinc-300 text-sm mt-1"></p>
-          </div>
-
-          <!-- Date -->
-          <div>
-            <span class="text-xs text-zinc-500 uppercase tracking-wide">Date</span>
-            <p id="detail-date" class="text-zinc-400 text-sm mt-1"></p>
-          </div>
-
-          <!-- Files Changed -->
-          <div>
-            <span class="text-xs text-zinc-500 uppercase tracking-wide">Files Changed</span>
-            <div id="detail-files" class="mt-2 max-h-64 overflow-y-auto space-y-1"></div>
+            <span
+              class="text-[10px] font-bold text-theme-dim uppercase tracking-wider mb-1.5 block flex items-center justify-between">
+              Files Changed
+              <span id="files-count"
+                class="bg-theme-border text-theme-text px-1.5 py-0.5 rounded-full text-[9px]">0</span>
+            </span>
+            <div id="detail-files"
+              class="mt-2 max-h-64 overflow-y-auto space-y-1 bg-theme-bg rounded-lg p-2 border border-theme-border/50">
+            </div>
           </div>
         </div>
 
@@ -239,9 +164,25 @@
       </div>
     </div>
   </div>
+  <script>
+    lucide.createIcons();
+
+    // Theme toggle logic
+    const themeBtn = document.getElementById('toggle-theme');
+    const html = document.documentElement;
+
+    // Check local storage or default to dark
+    if (localStorage.theme === 'light') {
+      html.classList.remove('dark');
+    }
+
+    themeBtn.addEventListener('click', () => {
+      html.classList.toggle('dark');
+      localStorage.theme = html.classList.contains('dark') ? 'dark' : 'light';
+      // Dispatch event so canvas can redraw with new colors
+      window.dispatchEvent(new Event('theme-changed'));
+    });
+  </script>
 </body>
 
 </html>
-<script>
-  lucide.createIcons();
-</script>
