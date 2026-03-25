@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bufio"
+	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -78,18 +81,11 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 	}
 
 	commitRefs := make(map[string][]string)
-	refIter, err := repo.References()
+	branchIter, err := repo.Branches()
 	if err == nil {
-		_ = refIter.ForEach(func(ref *plumbing.Reference) error {
-			name := ref.Name()
-			if !name.IsBranch() && !name.IsRemote() {
-				return nil
-			}
-			branchName := name.Short()
-			if strings.HasSuffix(branchName, "/HEAD") {
-				return nil
-			}
-			branchHash := ref.Hash().String()
+		_ = branchIter.ForEach(func(branchRef *plumbing.Reference) error {
+			branchName := branchRef.Name().Short()
+			branchHash := branchRef.Hash().String()
 
 			commitRefs[branchHash] = append(commitRefs[branchHash], branchName)
 
@@ -103,6 +99,17 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 			return nil
 		})
 	}
+
+	mergedBranchByCommit := mergedBranchNamesFromCommits(commits)
+	if reflogMerged := mergedBranchNamesFromReflog(); len(reflogMerged) > 0 {
+		for hash, name := range reflogMerged {
+			if _, exists := mergedBranchByCommit[hash]; !exists {
+				mergedBranchByCommit[hash] = name
+			}
+		}
+	}
+
+	applyMergedBranchFallbacks(commits, mergedBranchByCommit, commitRefs, branchLaneNames)
 
 	// Build the graph structure
 	graph := &Graph{
@@ -188,4 +195,105 @@ func orderBranchNames(names []string, headName string) []string {
 	}
 	sort.Strings(remaining)
 	return append([]string{headName}, remaining...)
+}
+
+func mergedBranchNamesFromCommits(commits map[string]*CommitData) map[string]string {
+	result := make(map[string]string)
+	for hash, commit := range commits {
+		if len(commit.Parents) < 2 {
+			continue
+		}
+		name := parseMergedBranchName(commit.Message)
+		if name == "" {
+			continue
+		}
+		result[hash] = name
+	}
+	return result
+}
+
+func mergedBranchNamesFromReflog() map[string]string {
+	result := make(map[string]string)
+	file, err := os.Open(".git/logs/HEAD")
+	if err != nil {
+		return result
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.SplitN(line, "\t", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		metaFields := strings.Fields(parts[0])
+		if len(metaFields) < 2 {
+			continue
+		}
+		newHash := metaFields[1]
+		message := parts[1]
+		name := parseMergedBranchName(message)
+		if name == "" {
+			continue
+		}
+		result[newHash] = name
+	}
+
+	return result
+}
+
+func parseMergedBranchName(message string) string {
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?i)merge pull request #\d+ from [^/]+/([^\s]+)`),
+		regexp.MustCompile(`(?i)merge branch ['\"]([^'\"]+)['\"]`),
+		regexp.MustCompile(`(?i)merge remote-tracking branch ['\"]([^'\"]+)['\"]`),
+		regexp.MustCompile(`(?i)^merge\s+([^:]+)`),
+	}
+
+	for _, pattern := range patterns {
+		matches := pattern.FindStringSubmatch(strings.TrimSpace(message))
+		if len(matches) < 2 {
+			continue
+		}
+		name := strings.TrimSpace(matches[1])
+		if name != "" {
+			return name
+		}
+	}
+	return ""
+}
+
+func applyMergedBranchFallbacks(commits map[string]*CommitData, mergedBranches map[string]string, commitRefs map[string][]string, branchLaneNames map[int][]string) {
+	if len(mergedBranches) == 0 {
+		return
+	}
+
+	for mergeHash, branchName := range mergedBranches {
+		mergeCommit, exists := commits[mergeHash]
+		if !exists {
+			continue
+		}
+		if len(mergeCommit.Parents) < 2 {
+			if len(commitRefs[mergeHash]) == 0 {
+				commitRefs[mergeHash] = []string{branchName}
+				lane := mergeCommit.Lane
+				if lane >= 0 && !containsString(branchLaneNames[lane], branchName) {
+					branchLaneNames[lane] = append(branchLaneNames[lane], branchName)
+				}
+			}
+			continue
+		}
+
+		mergedParent := mergeCommit.Parents[1]
+		if len(commitRefs[mergedParent]) == 0 {
+			commitRefs[mergedParent] = []string{branchName}
+			if commit, ok := commits[mergedParent]; ok {
+				lane := commit.Lane
+				if lane >= 0 && !containsString(branchLaneNames[lane], branchName) {
+					branchLaneNames[lane] = append(branchLaneNames[lane], branchName)
+				}
+			}
+		}
+	}
 }
