@@ -128,6 +128,16 @@ function screenToWorld(x, y) {
   };
 }
 
+// Zoom toward a specific screen point (used by wheel and keyboard)
+function zoomAtPoint(screenX, screenY, factor) {
+  const worldBefore = screenToWorld(screenX, screenY);
+  camera.scale = Math.min(camera.maxScale, Math.max(camera.minScale, camera.scale * factor));
+  const worldAfter = screenToWorld(screenX, screenY);
+  camera.x += worldAfter.x - worldBefore.x;
+  camera.y += worldAfter.y - worldBefore.y;
+  render();
+}
+
 // Get lane color
 function getLaneColor(lane) {
   return LANE_COLORS[lane % LANE_COLORS.length];
@@ -173,7 +183,7 @@ function drawNode(node, index) {
   const screen = worldToScreen(pos.x, pos.y);
   const radius = NODE_RADIUS * camera.scale;
   const color = getLaneColor(node.lane);
-  
+
   const bgTheme = getThemeVar('--bg');
   const textTheme = getThemeVar('--text');
   const panelTheme = getThemeVar('--panel');
@@ -227,7 +237,7 @@ function drawNode(node, index) {
     const textWidth = ctx.measureText(refsString).width;
     const paddingX = 8 * camera.scale;
     const paddingY = 4 * camera.scale;
-    
+
     const tagX = screen.x;
     const tagY = screen.y - radius - 12 * camera.scale;
 
@@ -235,7 +245,7 @@ function drawNode(node, index) {
     ctx.strokeStyle = color;
     ctx.lineWidth = 1 * camera.scale;
     ctx.beginPath();
-    ctx.roundRect(tagX - textWidth/2 - paddingX, tagY - paddingY, textWidth + paddingX*2, 14 * camera.scale + paddingY*2, 4 * camera.scale);
+    ctx.roundRect(tagX - textWidth / 2 - paddingX, tagY - paddingY, textWidth + paddingX * 2, 14 * camera.scale + paddingY * 2, 4 * camera.scale);
     ctx.fill();
     ctx.stroke();
 
@@ -282,7 +292,7 @@ function drawLaneLines() {
     const startX = bounds.minX - 50;
     const endX = bounds.maxX + 50;
     const y = lane.index * LANE_HEIGHT;
-    
+
     const startScreen = worldToScreen(startX, y);
     const endScreen = worldToScreen(endX, y);
 
@@ -393,7 +403,7 @@ function showDetail(node) {
 
   const filesContainer = document.getElementById('detail-files');
   filesContainer.innerHTML = '';
-  
+
   if (filesCountSpan) {
     filesCountSpan.textContent = node.files ? node.files.length : '0';
   }
@@ -402,21 +412,21 @@ function showDetail(node) {
     node.files.forEach(file => {
       const div = document.createElement('div');
       div.className = 'flex items-center gap-2 text-xs py-1.5 px-2.5 hover:bg-theme-border/30 rounded-md transition-colors truncate';
-      
+
       const statusSpan = document.createElement('span');
       let statusColor = 'text-theme-blue';
       if (file.status === 'A') statusColor = 'text-theme-green';
       if (file.status === 'D') statusColor = 'text-theme-red';
       if (file.status === 'M') statusColor = 'text-theme-yellow';
-      
+
       statusSpan.className = `font-bold ${statusColor} w-4 text-center`;
       statusSpan.textContent = file.status;
-      
+
       const nameSpan = document.createElement('span');
       nameSpan.className = 'text-theme-text truncate flex-1';
       nameSpan.textContent = file.name;
       nameSpan.title = file.name;
-      
+
       div.appendChild(statusSpan);
       div.appendChild(nameSpan);
       filesContainer.appendChild(div);
@@ -453,7 +463,7 @@ function setActiveTab(tab) {
   tabDetailsBtn.classList.toggle('text-white', isDetails);
   tabDetailsBtn.classList.toggle('text-theme-muted', !isDetails);
   tabDetailsBtn.classList.toggle('bg-transparent', !isDetails);
-  
+
   tabCommandsBtn.classList.toggle('bg-theme-blue', !isDetails);
   tabCommandsBtn.classList.toggle('text-white', !isDetails);
   tabCommandsBtn.classList.toggle('text-theme-muted', isDetails);
@@ -531,37 +541,37 @@ if (copyHashBtn) {
 function findLatestNodeIndexForBranch(startNode) {
   if (!startNode) return -1;
   const targetId = startNode.hash || startNode.id;
-  
+
   const childrenMap = {};
   graphData.edges.forEach(e => {
-      if (!childrenMap[e.target]) childrenMap[e.target] = [];
-      childrenMap[e.target].push(e.source);
+    if (!childrenMap[e.target]) childrenMap[e.target] = [];
+    childrenMap[e.target].push(e.source);
   });
 
   const queue = [targetId];
   const visited = new Set([targetId]);
   let bestIndex = Infinity;
 
-  while(queue.length > 0) {
-      const currId = queue.shift();
-      const currIdx = graphData.nodes.findIndex(n => (n.hash || n.id) === currId);
-      if (currIdx === -1) continue;
-      
-      const currNode = graphData.nodes[currIdx];
-      
-      if (currNode.refs && currNode.refs.length > 0) {
-          if (currIdx < bestIndex) {
-              bestIndex = currIdx;
-          }
-      }
+  while (queue.length > 0) {
+    const currId = queue.shift();
+    const currIdx = graphData.nodes.findIndex(n => (n.hash || n.id) === currId);
+    if (currIdx === -1) continue;
 
-      const children = childrenMap[currId] || [];
-      for (const childId of children) {
-          if (!visited.has(childId)) {
-              visited.add(childId);
-              queue.push(childId);
-          }
+    const currNode = graphData.nodes[currIdx];
+
+    if (currNode.refs && currNode.refs.length > 0) {
+      if (currIdx < bestIndex) {
+        bestIndex = currIdx;
       }
+    }
+
+    const children = childrenMap[currId] || [];
+    for (const childId of children) {
+      if (!visited.has(childId)) {
+        visited.add(childId);
+        queue.push(childId);
+      }
+    }
   }
 
   if (bestIndex === Infinity) {
@@ -595,6 +605,8 @@ canvas.addEventListener('click', (e) => {
 let isPanning = false;
 let panStartX = 0;
 let panStartY = 0;
+let mouseX = 0;
+let mouseY = 0;
 
 canvas.addEventListener('mousedown', (e) => {
   isPanning = true;
@@ -604,6 +616,10 @@ canvas.addEventListener('mousedown', (e) => {
 });
 
 canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = e.clientX - rect.left;
+  mouseY = e.clientY - rect.top;
+
   if (!isPanning) return;
 
   const dx = e.clientX - panStartX;
@@ -635,17 +651,8 @@ canvas.addEventListener('wheel', (e) => {
   const mouseX = e.clientX - rect.left;
   const mouseY = e.clientY - rect.top;
 
-  const worldBefore = screenToWorld(mouseX, mouseY);
-
   const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-  camera.scale = Math.min(camera.maxScale, Math.max(camera.minScale, camera.scale * zoomFactor));
-
-  const worldAfter = screenToWorld(mouseX, mouseY);
-
-  camera.x += worldAfter.x - worldBefore.x;
-  camera.y += worldAfter.y - worldBefore.y;
-
-  render();
+  zoomAtPoint(mouseX, mouseY, zoomFactor);
 }, { passive: false });
 
 document.addEventListener('keydown', (e) => {
@@ -694,12 +701,10 @@ document.addEventListener('keydown', (e) => {
   }
 
   if (e.key === '=' || e.key === '+') {
-    camera.scale = Math.min(camera.maxScale, camera.scale * 1.2);
-    render();
+    zoomAtPoint(mouseX, mouseY, 1.2);
   }
   if (e.key === '-') {
-    camera.scale = Math.max(camera.minScale, camera.scale * 0.8);
-    render();
+    zoomAtPoint(mouseX, mouseY, 0.8);
   }
 });
 
