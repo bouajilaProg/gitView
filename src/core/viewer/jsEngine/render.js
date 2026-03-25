@@ -175,8 +175,8 @@ function drawLaneLines() {
     const bounds = laneBounds[lane.index];
     if (!bounds) return;
 
-    const startX = bounds.minX - 50;
-    const endX = bounds.maxX + 50;
+    const startX = bounds.minX;
+    const endX = bounds.maxX;
     const y = lane.index * LANE_HEIGHT;
 
     const startScreen = worldToScreen(startX, y);
@@ -218,7 +218,6 @@ export function render() {
     nodeIndexMap[node.id] = i;
   });
 
-  drawLaneLines();
 
   state.graphData.edges.forEach(edge => {
     const sourceIndex = nodeIndexMap[edge.source];
