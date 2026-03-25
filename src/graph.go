@@ -77,12 +77,19 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 		headName = ref.Name().Short()
 	}
 
-	branchIter, err := repo.Branches()
 	commitRefs := make(map[string][]string)
+	refIter, err := repo.References()
 	if err == nil {
-		_ = branchIter.ForEach(func(branchRef *plumbing.Reference) error {
-			branchName := branchRef.Name().Short()
-			branchHash := branchRef.Hash().String()
+		_ = refIter.ForEach(func(ref *plumbing.Reference) error {
+			name := ref.Name()
+			if !name.IsBranch() && !name.IsRemote() {
+				return nil
+			}
+			branchName := name.Short()
+			if strings.HasSuffix(branchName, "/HEAD") {
+				return nil
+			}
+			branchHash := ref.Hash().String()
 
 			commitRefs[branchHash] = append(commitRefs[branchHash], branchName)
 

@@ -16,4 +16,4 @@ Thumbs.db
 *.temp.*
 
 # tools
-./tools/tailwindcss
+tools/tailwindcss
