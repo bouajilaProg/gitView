@@ -1,6 +1,5 @@
 // Constants - HORIZONTAL layout
-const NODE_WIDTH = 36;
-const NODE_HEIGHT = 24;
+const NODE_RADIUS = 26;
 const LANE_HEIGHT = 80; // Vertical spacing between branches (lanes)
 const COLUMN_WIDTH = 120; // Horizontal spacing between commits
 const HIT_RADIUS = 25;
@@ -170,13 +169,12 @@ function drawEdge(edge, source, target, sourceIndex, targetIndex) {
 function drawNode(node, index) {
   const pos = getNodePosition(node, index);
   const screen = worldToScreen(pos.x, pos.y);
-  const halfWidth = (NODE_WIDTH * camera.scale) / 2;
-  const halfHeight = (NODE_HEIGHT * camera.scale) / 2;
+  const radius = NODE_RADIUS * camera.scale;
   const color = getLaneColor(node.lane);
 
-  // Draw rectangle
+  // Draw circle
   ctx.beginPath();
-  ctx.rect(screen.x - halfWidth, screen.y - halfHeight, halfWidth * 2, halfHeight * 2);
+  ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
 
   if (selectedNode && selectedNode.id === node.id) {
     ctx.fillStyle = '#ffffff';
@@ -192,7 +190,7 @@ function drawNode(node, index) {
     ctx.stroke();
   }
 
-  // Draw hash inside square
+  // Draw hash inside circle
   if (camera.scale > 0.4) {
     const hashColor = selectedNode && selectedNode.id === node.id ? '#18181b' : '#ffffff';
     ctx.fillStyle = hashColor;
@@ -210,7 +208,32 @@ function drawNode(node, index) {
     ctx.font = `${Math.max(8, 9 * camera.scale)}px monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(truncated, screen.x, screen.y + halfHeight + 8 * camera.scale);
+    ctx.fillText(truncated, screen.x, screen.y + radius + 8 * camera.scale);
+  }
+
+  // Draw refs (branch names) above node
+  if (node.refs && node.refs.length > 0) {
+    const refsString = node.refs.join(', ');
+    ctx.font = `600 ${Math.max(9, 11 * camera.scale)}px monospace`;
+    const textWidth = ctx.measureText(refsString).width;
+    const paddingX = 8 * camera.scale;
+    const paddingY = 4 * camera.scale;
+    
+    const tagX = screen.x;
+    const tagY = screen.y - radius - 12 * camera.scale;
+
+    ctx.fillStyle = '#16161e'; // bg-tokyo-panel
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1 * camera.scale;
+    ctx.beginPath();
+    ctx.roundRect(tagX - textWidth/2 - paddingX, tagY - paddingY, textWidth + paddingX*2, 14 * camera.scale + paddingY*2, 4 * camera.scale);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(refsString, tagX, tagY);
   }
 }
 
@@ -306,7 +329,8 @@ function findNodeAt(screenX, screenY) {
     const pos = getNodePosition(node, i);
     const dx = world.x - pos.x;
     const dy = world.y - pos.y;
-    if (Math.abs(dx) <= NODE_WIDTH / 2 && Math.abs(dy) <= NODE_HEIGHT / 2) {
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance <= NODE_RADIUS) {
       return node;
     }
   }
@@ -352,14 +376,29 @@ function showDetail(node) {
   if (node.files && node.files.length > 0) {
     node.files.forEach(file => {
       const div = document.createElement('div');
-      div.className = 'text-xs text-zinc-400 py-1 px-2 bg-zinc-900 rounded truncate';
-      div.textContent = file;
-      div.title = file;
+      div.className = 'flex items-center gap-2 text-xs py-1 px-2 bg-tokyo-bg rounded truncate';
+      
+      const statusSpan = document.createElement('span');
+      let statusColor = 'text-tokyo-blue';
+      if (file.status === 'A') statusColor = 'text-tokyo-green';
+      if (file.status === 'D') statusColor = 'text-tokyo-red';
+      if (file.status === 'M') statusColor = 'text-tokyo-yellow';
+      
+      statusSpan.className = `font-bold ${statusColor}`;
+      statusSpan.textContent = file.status;
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'text-tokyo-text truncate';
+      nameSpan.textContent = file.name;
+      nameSpan.title = file.name;
+      
+      div.appendChild(statusSpan);
+      div.appendChild(nameSpan);
       filesContainer.appendChild(div);
     });
   } else {
     const div = document.createElement('div');
-    div.className = 'text-xs text-zinc-500 italic';
+    div.className = 'text-xs text-tokyo-dim italic';
     div.textContent = 'No files changed';
     filesContainer.appendChild(div);
   }
@@ -388,10 +427,15 @@ function setActiveTab(tab) {
   const isDetails = tab === 'details';
   detailContent.classList.toggle('hidden', !isDetails);
   commandsContent.classList.toggle('hidden', isDetails);
-  tabDetailsBtn.classList.toggle('bg-zinc-700', isDetails);
-  tabDetailsBtn.classList.toggle('text-zinc-100', isDetails);
-  tabCommandsBtn.classList.toggle('bg-zinc-700', !isDetails);
-  tabCommandsBtn.classList.toggle('text-zinc-100', !isDetails);
+  tabDetailsBtn.classList.toggle('bg-tokyo-blue', isDetails);
+  tabDetailsBtn.classList.toggle('text-tokyo-bg', isDetails);
+  tabDetailsBtn.classList.toggle('text-tokyo-muted', !isDetails);
+  tabDetailsBtn.classList.toggle('bg-transparent', !isDetails);
+  
+  tabCommandsBtn.classList.toggle('bg-tokyo-blue', !isDetails);
+  tabCommandsBtn.classList.toggle('text-tokyo-bg', !isDetails);
+  tabCommandsBtn.classList.toggle('text-tokyo-muted', isDetails);
+  tabCommandsBtn.classList.toggle('bg-transparent', isDetails);
 }
 
 tabDetailsBtn.addEventListener('click', () => setActiveTab('details'));
@@ -413,20 +457,27 @@ function updateCommands(node) {
     row.className = 'space-y-1';
 
     const label = document.createElement('div');
-    label.className = 'text-xs text-zinc-500 uppercase tracking-wide';
+    label.className = 'text-xs text-tokyo-dim uppercase tracking-wide';
     label.textContent = item.label;
 
     const commandRow = document.createElement('div');
     commandRow.className = 'flex items-start gap-2';
 
     const code = document.createElement('code');
-    code.className = 'block text-xs text-zinc-200 bg-zinc-900 px-2 py-1 rounded break-all flex-1';
+    code.className = 'block text-xs text-tokyo-text bg-tokyo-bg px-2 py-1 rounded break-all flex-1 border border-tokyo-border';
     code.textContent = item.cmd;
 
     const copyButton = document.createElement('button');
     copyButton.type = 'button';
-    copyButton.className = 'text-xs text-zinc-300 px-2 py-1 rounded bg-zinc-700/80 hover:bg-zinc-600';
-    copyButton.textContent = 'Copy';
+    copyButton.className = 'size-7 inline-flex items-center justify-center rounded hover:bg-tokyo-border/80 text-tokyo-muted flex-shrink-0';
+    copyButton.setAttribute('aria-label', `Copy ${item.label} command`);
+    copyButton.innerHTML = `
+      <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="9" y="9" width="13" height="13" rx="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </svg>
+    `;
     copyButton.addEventListener('click', () => copyText(item.cmd));
 
     commandRow.appendChild(code);
@@ -455,13 +506,56 @@ if (copyHashBtn) {
   });
 }
 
-function findLatestNodeIndexForLane(lane) {
-  for (let i = 0; i < graphData.nodes.length; i++) {
-    if (graphData.nodes[i].lane === lane) {
-      return i;
+function findLatestNodeIndexForBranch(startNode) {
+  if (!startNode) return -1;
+  const targetId = startNode.hash || startNode.id;
+  
+  // Find all children maps
+  const childrenMap = {};
+  graphData.edges.forEach(e => {
+      if (!childrenMap[e.target]) childrenMap[e.target] = [];
+      childrenMap[e.target].push(e.source);
+  });
+
+  // Simple BFS up to find the nearest branch tip
+  const queue = [targetId];
+  const visited = new Set([targetId]);
+  let bestNode = null;
+  let bestIndex = Infinity;
+
+  while(queue.length > 0) {
+      const currId = queue.shift();
+      const currIdx = graphData.nodes.findIndex(n => (n.hash || n.id) === currId);
+      if (currIdx === -1) continue;
+      
+      const currNode = graphData.nodes[currIdx];
+      
+      if (currNode.refs && currNode.refs.length > 0) {
+          if (currIdx < bestIndex) {
+              bestIndex = currIdx;
+              bestNode = currNode;
+          }
+      }
+
+      const children = childrenMap[currId] || [];
+      for (const childId of children) {
+          if (!visited.has(childId)) {
+              visited.add(childId);
+              queue.push(childId);
+          }
+      }
+  }
+
+  // Fallback to latest in lane if no branch tip found
+  if (bestIndex === Infinity) {
+    for (let i = 0; i < graphData.nodes.length; i++) {
+      if (graphData.nodes[i].lane === startNode.lane) {
+        return i;
+      }
     }
   }
-  return -1;
+
+  return bestIndex !== Infinity ? bestIndex : -1;
 }
 
 function focusOnNode(node, index) {
@@ -585,7 +679,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'r' && !e.metaKey && !e.ctrlKey) {
     let targetIndex = -1;
     if (selectedNode) {
-      targetIndex = findLatestNodeIndexForLane(selectedNode.lane);
+      targetIndex = findLatestNodeIndexForBranch(selectedNode);
     }
     if (targetIndex === -1 && graphData.nodes.length > 0) {
       targetIndex = 0;

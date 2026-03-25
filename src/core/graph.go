@@ -78,10 +78,14 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 	}
 
 	branchIter, err := repo.Branches()
+	commitRefs := make(map[string][]string)
 	if err == nil {
 		_ = branchIter.ForEach(func(branchRef *plumbing.Reference) error {
 			branchName := branchRef.Name().Short()
 			branchHash := branchRef.Hash().String()
+
+			commitRefs[branchHash] = append(commitRefs[branchHash], branchName)
+
 			if commit, exists := commits[branchHash]; exists {
 				lane := commit.Lane
 				names := branchLaneNames[lane]
@@ -115,6 +119,7 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 			Date:    c.Date.Format(time.RFC3339),
 			Files:   c.Files,
 			Lane:    c.Lane,
+			Refs:    commitRefs[c.Hash],
 		}
 		graph.Nodes = append(graph.Nodes, node)
 

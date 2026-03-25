@@ -6,17 +6,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>gitView</title>
   <link rel="stylesheet" href="/styles.css">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/tailwind.js"></script>
+  <script src="/lucide.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            tokyo: {
+              bg: '#1a1b26',
+              panel: '#16161e',
+              border: '#292e42',
+              text: '#c0caf5',
+              muted: '#a9b1d6',
+              dim: '#565f89',
+              blue: '#7aa2f7',
+              green: '#9ece6a',
+              yellow: '#e0af68',
+              red: '#f7768e',
+              magenta: '#bb9af7',
+              cyan: '#7dcfff',
+              orange: '#ff9e64'
+            }
+          }
+        }
+      }
+    }
+  </script>
   <script src="/app.js" defer></script>
 </head>
 
-<body class="bg-zinc-900 text-zinc-100 font-mono">
+<body class="bg-tokyo-bg text-tokyo-text font-mono">
   <!-- Fullscreen Canvas Container -->
   <div class="h-dvh w-full relative">
     <canvas id="graph-canvas" class="block absolute inset-0"></canvas>
 
     <!-- Controls Overlay -->
-    <div class="absolute top-4 left-4 bg-zinc-800/90 px-3 py-2 rounded-lg text-xs text-zinc-400 space-y-1 z-10">
+    <div class="absolute top-4 left-4 bg-tokyo-panel/90 px-3 py-2 rounded-lg text-xs text-tokyo-muted space-y-1 z-10 border border-tokyo-border">
       <div>
         <span>Scroll: Zoom</span>
         <span class="mx-2">|</span>
@@ -24,6 +50,111 @@
         <span class="mx-2">|</span>
         <span>Click: Select</span>
       </div>
+      <div class="text-tokyo-dim">
+        <span>R: Latest on branch</span>
+        <span class="mx-2">|</span>
+        <span>M: Toggle messages</span>
+        <span class="mx-2">|</span>
+        <span>Esc: Close</span>
+      </div>
+    </div>
+
+    <!-- Toggle Button -->
+    <div class="absolute top-4 right-4 flex gap-2 z-10">
+      <button id="toggle-messages" class="bg-tokyo-panel/90 px-3 py-2 rounded-lg text-xs text-tokyo-muted hover:bg-tokyo-border border border-tokyo-border"
+        aria-label="Toggle commit messages">
+        Messages: ON
+      </button>
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="absolute inset-0 flex items-center justify-center hidden z-10">
+      <div class="text-center">
+        <p class="text-tokyo-muted text-lg">No commits found</p>
+        <p class="text-tokyo-dim text-sm mt-2">Make sure you're running this in a git repository</p>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-state" class="absolute inset-0 flex items-center justify-center bg-tokyo-bg z-10">
+      <div class="text-center">
+        <div class="size-8 border-2 border-tokyo-border border-t-tokyo-blue rounded-full mx-auto"
+          style="animation: spin 1s linear infinite;"></div>
+        <p class="text-tokyo-muted mt-4">Loading repository...</p>
+      </div>
+    </div>
+
+    <!-- Overlay backdrop (click to close) -->
+    <div id="panel-backdrop" class="fixed inset-0 bg-black/50 z-20 hidden" style="transition: opacity 150ms ease-out;">
+    </div>
+
+    <!-- Detail Panel (overlay modal) -->
+    <div id="detail-panel"
+      class="fixed top-0 right-0 h-dvh w-96 bg-tokyo-panel border-l border-tokyo-border flex flex-col z-30 translate-x-full shadow-2xl"
+      style="transition: transform 150ms ease-out;">
+      <!-- Header -->
+      <div class="flex items-center justify-between p-4 border-b border-tokyo-border">
+        <h2 class="text-sm font-semibold text-tokyo-text">Commit Details</h2>
+        <button id="close-panel" class="size-6 flex items-center justify-center rounded hover:bg-tokyo-border text-tokyo-muted"
+          aria-label="Close panel">
+          <i data-lucide="x" class="size-4"></i>
+        </button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex gap-2 px-4 pt-3">
+        <button id="tab-details"
+          class="px-2 py-1 text-xs rounded bg-tokyo-blue text-tokyo-bg font-semibold">Details</button>
+        <button id="tab-commands"
+          class="px-2 py-1 text-xs rounded text-tokyo-muted hover:text-tokyo-text hover:bg-tokyo-border/50">Commands</button>
+      </div>
+
+      <!-- Content -->
+      <div class="flex-1 overflow-y-auto p-4">
+        <div id="detail-content" class="space-y-4">
+          <!-- Commit Hash -->
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-tokyo-dim uppercase tracking-wide">Hash</span>
+              <button id="copy-hash"
+                class="size-7 inline-flex items-center justify-center rounded hover:bg-tokyo-border/80 text-tokyo-muted flex-shrink-0"
+                type="button" aria-label="Copy hash">
+                <i data-lucide="copy" class="size-4"></i>
+              </button>
+            </div>
+            <p id="detail-hash" class="text-tokyo-yellow font-mono text-sm mt-1 break-all"></p>
+          </div>
+
+          <!-- Message -->
+          <div>
+            <span class="text-xs text-tokyo-dim uppercase tracking-wide">Message</span>
+            <p id="detail-message" class="text-tokyo-text text-sm mt-1 whitespace-pre-wrap"></p>
+          </div>
+
+          <!-- Author -->
+          <div>
+            <span class="text-xs text-tokyo-dim uppercase tracking-wide">Author</span>
+            <p id="detail-author" class="text-tokyo-blue text-sm mt-1"></p>
+          </div>
+
+          <!-- Date -->
+          <div>
+            <span class="text-xs text-tokyo-dim uppercase tracking-wide">Date</span>
+            <p id="detail-date" class="text-tokyo-muted text-sm mt-1"></p>
+          </div>
+
+          <!-- Files Changed -->
+          <div>
+            <span class="text-xs text-tokyo-dim uppercase tracking-wide">Files Changed</span>
+            <div id="detail-files" class="mt-2 max-h-64 overflow-y-auto space-y-1"></div>
+          </div>
+        </div>
+
+        <div id="commands-content" class="space-y-4 hidden">
+          <div id="detail-commands" class="space-y-4"></div>
+        </div>
+      </div>
+    </div>
       <div class="text-zinc-500">
         <span>R: Latest on lane</span>
         <span class="mx-2">|</span>
@@ -133,3 +264,6 @@
 </body>
 
 </html>
+<script>
+  lucide.createIcons();
+</script>
