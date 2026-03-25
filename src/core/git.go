@@ -1,9 +1,12 @@
 package main
 
-import "github.com/go-git/go-git/v5/plumbing/object"
+import (
+	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/utils/merkletrie"
+)
 
-func getChangedFiles(c *object.Commit) []string {
-	var files []string
+func getChangedFiles(c *object.Commit) []FileStat {
+	var files []FileStat
 
 	// Get parent commit for diff
 	parent, err := c.Parent(0)
@@ -14,7 +17,7 @@ func getChangedFiles(c *object.Commit) []string {
 			return files
 		}
 		tree.Files().ForEach(func(f *object.File) error {
-			files = append(files, f.Name)
+			files = append(files, FileStat{Name: f.Name, Status: "A"})
 			return nil
 		})
 		return files
@@ -37,11 +40,24 @@ func getChangedFiles(c *object.Commit) []string {
 	}
 
 	for _, change := range changes {
+		action, err := change.Action()
+		if err != nil {
+			continue
+		}
+		status := "M"
+		switch action {
+		case merkletrie.Insert:
+			status = "A"
+		case merkletrie.Delete:
+			status = "D"
+		case merkletrie.Modify:
+			status = "M"
+		}
 		name := change.To.Name
 		if name == "" {
 			name = change.From.Name
 		}
-		files = append(files, name)
+		files = append(files, FileStat{Name: name, Status: status})
 	}
 
 	return files

@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #ffffff;
+  --panel: #f3f4f6;
+  --border: #e5e7eb;
+  --text: #1f2937;
+  --muted: #4b5563;
+  --dim: #9ca3af;
+  --blue: #3b82f6;
+  --green: #22c55e;
+  --yellow: #f59e0b;
+  --red: #ef4444;
+  --magenta: #d946ef;
+  --cyan: #06b6d4;
+  --orange: #f97316;
+  --hash-text: #ffffff;
+  --hash-bg: #1f2937;
+}
+
+:root.dark {
+  --bg: #1a1b26;
+  --panel: #16161e;
+  --border: #292e42;
+  --text: #c0caf5;
+  --muted: #a9b1d6;
+  --dim: #565f89;
+  --blue: #7aa2f7;
+  --green: #9ece6a;
+  --yellow: #e0af68;
+  --red: #f7768e;
+  --magenta: #bb9af7;
+  --cyan: #7dcfff;
+  --orange: #ff9e64;
+  --hash-text: #18181b;
+  --hash-bg: #ffffff;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+}
+
+/* Scrollbar styles for dark/light mode */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dim);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+.fade {
+  transition: opacity 150ms ease-out;
+}

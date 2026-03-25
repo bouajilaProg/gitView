@@ -1,12 +1,8 @@
-name: Build
+name: Release
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  release:
-    types: [created]
+    tags: ['v*']
 
 jobs:
   build:
@@ -20,7 +16,7 @@ jobs:
           go-version: '1.22'
 
       - name: Build
-        run: go build -v -o gitView ./src
+        run: go build -v -o gitView ./src/core
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -30,7 +26,6 @@ jobs:
 
   release:
     needs: build
-    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -63,7 +58,7 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-        run: go build -v -ldflags="-s -w" -o gitView-${{ matrix.suffix }} ./src
+        run: go build -v -ldflags="-s -w" -o gitView-${{ matrix.suffix }} ./src/core
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2

@@ -7,13 +7,19 @@ tags = ["dev-tools","git"]
 
 [flow]
   dev = {
-     cmd= "go build -o gitView ./src/core",
+     cmd= "./tools/tailwindcss -c tailwind.config.js -i src/core/viewer/style/tailwind.css -o src/core/viewer/style/output.css && go build -o gitView ./src/core",
      on_success= "./gitView",
-     watch=["*.go","assets/*","src/*"]
+     watch=["*.go","assets/*","src/**/*","tailwind.config.js","src/core/viewer/style/tailwind.css"]
    }
   build = {
-     cmd= "go build -o gitView ./src/core"
+     cmd= "./tools/tailwindcss -c tailwind.config.js -i src/core/viewer/style/tailwind.css -o src/core/viewer/style/output.css --minify && go build -o gitView ./src/core"
    }
   test = {
      cmd= "go test ./src/core"
+   }
+  setup_linux = {
+     cmd= "sh tools/setup-tailwind-linux.sh"
+   }
+  setup_windows = {
+     cmd= "powershell -ExecutionPolicy Bypass -File tools/setup-tailwind-windows.ps1"
    }

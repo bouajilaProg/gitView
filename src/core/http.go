@@ -10,7 +10,7 @@ import (
 	"github.com/go-git/go-git/v5"
 )
 
-//go:embed viewer/*
+//go:embed viewer/**
 var staticFiles embed.FS
 
 func registerRoutes() {

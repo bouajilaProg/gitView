@@ -2,20 +2,29 @@ package main
 
 import "time"
 
+// FileStat represents a changed file and its status
+type FileStat struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
 // Node represents a commit node in the graph
 type Node struct {
-	ID      string   `json:"id"`
-	Message string   `json:"message"`
-	Author  string   `json:"author"`
-	Date    string   `json:"date"`
-	Files   []string `json:"files"`
-	Lane    int      `json:"lane"`
+	ID      string     `json:"id"`
+	Hash    string     `json:"hash"`
+	Message string     `json:"message"`
+	Author  string     `json:"author"`
+	Date    string     `json:"date"`
+	Files   []FileStat `json:"files"`
+	Lane    int        `json:"lane"`
+	Refs    []string   `json:"refs"`
 }
 
 // Edge represents a connection between commits
 type Edge struct {
 	Source string `json:"source"`
 	Target string `json:"target"`
+	Color  int    `json:"colorLane"`
 }
 
 // Graph represents the complete commit graph
@@ -38,7 +47,7 @@ type CommitData struct {
 	Author    string
 	Date      time.Time
 	Parents   []string
-	Files     []string
+	Files     []FileStat
 	Lane      int
 	Processed bool
 }

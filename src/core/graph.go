@@ -2,6 +2,7 @@ package main
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -70,23 +71,26 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 	assignLanes(commits, sortedOrder)
 
 	// Map lane names from branch tips
-	branchLaneNames := make(map[int]string)
+	branchLaneNames := make(map[int][]string)
 	headName := ""
 	if ref.Name().IsBranch() {
 		headName = ref.Name().Short()
 	}
 
 	branchIter, err := repo.Branches()
+	commitRefs := make(map[string][]string)
 	if err == nil {
 		_ = branchIter.ForEach(func(branchRef *plumbing.Reference) error {
 			branchName := branchRef.Name().Short()
 			branchHash := branchRef.Hash().String()
+
+			commitRefs[branchHash] = append(commitRefs[branchHash], branchName)
+
 			if commit, exists := commits[branchHash]; exists {
 				lane := commit.Lane
-				if branchName == headName {
-					branchLaneNames[lane] = branchName
-				} else if _, exists := branchLaneNames[lane]; !exists {
-					branchLaneNames[lane] = branchName
+				names := branchLaneNames[lane]
+				if !containsString(names, branchName) {
+					branchLaneNames[lane] = append(names, branchName)
 				}
 			}
 			return nil
@@ -109,20 +113,27 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 		}
 		node := Node{
 			ID:      c.Hash[:7],
+			Hash:    c.Hash,
 			Message: c.Message,
 			Author:  c.Author,
 			Date:    c.Date.Format(time.RFC3339),
 			Files:   c.Files,
 			Lane:    c.Lane,
+			Refs:    commitRefs[c.Hash],
 		}
 		graph.Nodes = append(graph.Nodes, node)
 
 		// Add edges to parents
-		for _, parent := range c.Parents {
-			if _, exists := commits[parent]; exists {
+		for index, parent := range c.Parents {
+			if parentCommit, exists := commits[parent]; exists {
+				colorLane := c.Lane
+				if index > 0 {
+					colorLane = parentCommit.Lane
+				}
 				graph.Edges = append(graph.Edges, Edge{
 					Source: c.Hash[:7],
 					Target: parent[:7],
+					Color:  colorLane,
 				})
 			}
 		}
@@ -130,10 +141,44 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 
 	if maxLane >= 0 {
 		for lane := 0; lane <= maxLane; lane++ {
-			laneName := branchLaneNames[lane]
+			names := append([]string{}, branchLaneNames[lane]...)
+			if len(names) > 0 {
+				names = orderBranchNames(names, headName)
+			}
+			laneName := strings.Join(names, ", ")
 			graph.Lanes = append(graph.Lanes, Lane{Index: lane, Name: laneName})
 		}
 	}
 
 	return graph, nil
+}
+
+func containsString(values []string, value string) bool {
+	for _, item := range values {
+		if item == value {
+			return true
+		}
+	}
+	return false
+}
+
+func orderBranchNames(names []string, headName string) []string {
+	unique := make([]string, 0, len(names))
+	for _, name := range names {
+		if !containsString(unique, name) {
+			unique = append(unique, name)
+		}
+	}
+	if headName == "" || !containsString(unique, headName) {
+		sort.Strings(unique)
+		return unique
+	}
+	remaining := make([]string, 0, len(unique)-1)
+	for _, name := range unique {
+		if name != headName {
+			remaining = append(remaining, name)
+		}
+	}
+	sort.Strings(remaining)
+	return append([]string{headName}, remaining...)
 }
