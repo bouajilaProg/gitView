@@ -24,61 +24,84 @@ function setActiveTab(tab) {
   const isDetails = tab === 'details';
   ui.detailContent.classList.toggle('hidden', !isDetails);
   ui.commandsContent.classList.toggle('hidden', isDetails);
-  ui.tabDetailsBtn.classList.toggle('bg-theme-blue', isDetails);
-  ui.tabDetailsBtn.classList.toggle('text-white', isDetails);
-  ui.tabDetailsBtn.classList.toggle('text-theme-muted', !isDetails);
-  ui.tabDetailsBtn.classList.toggle('bg-transparent', !isDetails);
 
-  ui.tabCommandsBtn.classList.toggle('bg-theme-blue', !isDetails);
-  ui.tabCommandsBtn.classList.toggle('text-white', !isDetails);
+  // Tab details button
+  ui.tabDetailsBtn.classList.toggle('text-theme-blue', isDetails);
+  ui.tabDetailsBtn.classList.toggle('text-theme-muted', !isDetails);
+  const detailsIndicator = ui.tabDetailsBtn.querySelector('span');
+  if (detailsIndicator) detailsIndicator.classList.toggle('scale-x-100', isDetails);
+  if (detailsIndicator) detailsIndicator.classList.toggle('scale-x-0', !isDetails);
+
+  // Tab commands button
+  ui.tabCommandsBtn.classList.toggle('text-theme-text', !isDetails);
   ui.tabCommandsBtn.classList.toggle('text-theme-muted', isDetails);
-  ui.tabCommandsBtn.classList.toggle('bg-transparent', isDetails);
+  const commandsIndicator = ui.tabCommandsBtn.querySelector('span');
+  if (commandsIndicator) commandsIndicator.classList.toggle('scale-x-100', !isDetails);
+  if (commandsIndicator) commandsIndicator.classList.toggle('scale-x-0', isDetails);
 }
 
 function updateCommands(node) {
   if (!ui.commandsList) return;
   const hash = node.hash || node.id;
+
   const commands = [
-    { label: 'moveTo', cmd: `git switch --detach ${hash}` },
-    { label: 'delete', cmd: `git revert ${hash}` },
-    { label: 'diff with one before', cmd: `git diff ${hash}^ ${hash}` },
-    { label: 'diff with my position now', cmd: `git diff HEAD ${hash}` }
+    { label: 'Switch to Commit', cmd: `git switch --detach ${hash}` },
+    { label: 'Revert Changes', cmd: `git revert ${hash}` },
+    { label: 'Diff with Parent', cmd: `git diff ${hash}^ ${hash}` },
+    { label: 'Diff with HEAD', cmd: `git diff HEAD ${hash}` }
   ];
 
   ui.commandsList.innerHTML = '';
-  commands.forEach(item => {
-    const row = document.createElement('div');
-    row.className = 'space-y-1.5';
 
+  commands.forEach(item => {
+    // 1. Container for Label + Action
+    const row = document.createElement('div');
+    row.className = 'space-y-2';
+
+    // 2. Small Label
     const label = document.createElement('div');
-    label.className = 'text-[10px] font-bold text-theme-dim uppercase tracking-wider';
+    label.className = 'text-[10px] font-bold text-theme-dim uppercase tracking-widest px-1';
     label.textContent = item.label;
 
-    const commandRow = document.createElement('div');
-    commandRow.className = 'flex items-stretch gap-2';
+    // 3. Unified Action Box (The Container)
+    const actionWrapper = document.createElement('div');
+    actionWrapper.className = 'group flex items-stretch bg-theme-bg border border-theme-border rounded-lg overflow-hidden hover:border-theme-blue/40 transition-all shadow-sm';
 
+    // 4. The Code Segment
     const code = document.createElement('code');
-    code.className = 'block text-xs text-theme-text bg-theme-panel/30 px-2.5 py-1.5 rounded-md break-all flex-1 border border-theme-border/30 shadow-sm';
+    code.className = 'flex-1 font-mono text-[11px] text-theme-text px-3 py-2.5 truncate select-all';
     code.textContent = item.cmd;
 
+    // 5. The Integrated Copy Button
     const copyButton = document.createElement('button');
     copyButton.type = 'button';
-    copyButton.className = 'w-8 inline-flex items-center justify-center rounded-md bg-theme-panel/30 border border-theme-border/30 hover:bg-theme-border text-theme-muted flex-shrink-0 transition-colors shadow-sm';
-    copyButton.setAttribute('aria-label', `Copy ${item.label} command`);
+    copyButton.className = 'px-3 bg-theme-border/20 border-l border-theme-border text-theme-muted hover:bg-theme-blue/10 hover:text-theme-blue transition-all flex items-center justify-center';
+    copyButton.title = `Copy ${item.label}`;
+
+    // Using Lucide-style SVG for consistency
     copyButton.innerHTML = `
-      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="9" y="9" width="13" height="13" rx="2" />
-        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
       </svg>
     `;
-    copyButton.addEventListener('click', () => copyText(item.cmd));
 
-    commandRow.appendChild(code);
-    commandRow.appendChild(copyButton);
+    copyButton.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevents parent clicks if necessary
+      copyText(item.cmd);
+
+      // Optional: Quick feedback on click
+      const originalIcon = copyButton.innerHTML;
+      copyButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-500"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => copyButton.innerHTML = originalIcon, 1500);
+    });
+
+    // Assemble
+    actionWrapper.appendChild(code);
+    actionWrapper.appendChild(copyButton);
 
     row.appendChild(label);
-    row.appendChild(commandRow);
+    row.appendChild(actionWrapper);
+
     ui.commandsList.appendChild(row);
   });
 }
@@ -105,12 +128,26 @@ export function showDetail(node) {
 
   const fullHash = node.hash || node.id;
   document.getElementById('detail-hash').textContent = fullHash;
+  if (ui.detailHashShort) {
+    ui.detailHashShort.textContent = fullHash.substring(0, 12);
+  }
   if (ui.copyHashBtn) {
     ui.copyHashBtn.dataset.value = fullHash;
   }
   document.getElementById('detail-message').textContent = node.message.trim();
   document.getElementById('detail-author').textContent = node.author;
   document.getElementById('detail-date').textContent = formatRelativeDate(node.date);
+
+  const branchEl = document.getElementById('detail-branch');
+  if (branchEl) {
+    const refs = Array.isArray(node.refs) ? node.refs.filter(Boolean) : [];
+    if (refs.length > 0) {
+      branchEl.textContent = refs.join(', ');
+    } else {
+      const laneMatch = state.graphData?.lanes?.find(lane => lane.index === node.lane);
+      branchEl.textContent = laneMatch?.name?.trim() || '--';
+    }
+  }
 
   const filesContainer = document.getElementById('detail-files');
   filesContainer.innerHTML = '';
@@ -122,23 +159,23 @@ export function showDetail(node) {
   if (node.files && node.files.length > 0) {
     node.files.forEach(file => {
       const div = document.createElement('div');
-      div.className = 'flex items-center gap-2 text-xs py-1.5 px-2.5 hover:bg-theme-border/30 rounded-md transition-colors truncate bg-theme-panel/30';
+      div.className = 'group flex items-center gap-3 text-xs py-2 px-3 hover:bg-theme-blue/5 rounded-lg border border-transparent hover:border-theme-blue/10 transition-all truncate';
 
-      const statusSpan = document.createElement('span');
-      let statusColor = 'text-theme-blue';
-      if (file.status === 'A') statusColor = 'text-theme-green';
-      if (file.status === 'D') statusColor = 'text-theme-red';
-      if (file.status === 'M') statusColor = 'text-theme-yellow';
+      const statusIcon = document.createElement('div');
+      let statusColor = 'bg-theme-blue/10 text-theme-blue ring-theme-blue/20';
+      if (file.status === 'A') statusColor = 'bg-theme-green/10 text-theme-green ring-theme-green/20';
+      if (file.status === 'D') statusColor = 'bg-theme-red/10 text-theme-red ring-theme-red/20';
+      if (file.status === 'M') statusColor = 'bg-theme-yellow/10 text-theme-yellow ring-theme-yellow/20';
 
-      statusSpan.className = `font-bold ${statusColor} w-4 text-center`;
-      statusSpan.textContent = file.status;
+      statusIcon.className = `size-5 flex items-center justify-center rounded text-[9px] font-bold ring-1 ring-inset ${statusColor}`;
+      statusIcon.textContent = file.status;
 
       const nameSpan = document.createElement('span');
-      nameSpan.className = 'text-theme-text truncate flex-1';
+      nameSpan.className = 'text-theme-text font-medium truncate flex-1';
       nameSpan.textContent = file.name;
       nameSpan.title = file.name;
 
-      div.appendChild(statusSpan);
+      div.appendChild(statusIcon);
       div.appendChild(nameSpan);
       filesContainer.appendChild(div);
     });

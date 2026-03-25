@@ -75,3 +75,92 @@ body {
 .fade {
   transition: opacity 150ms ease-out;
 }
+
+/* gitView UI Enhancements */
+
+:root {
+  --theme-purple: 168, 85, 247;
+  /* purple-500 */
+  --theme-blue: 59, 130, 246;
+  /* blue-500 */
+}
+
+/* Custom Scrollbar for the Detail Panel */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.2);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.4);
+}
+
+/* Unified Card Styling (Hash & Actions) */
+.copy-group-container {
+  display: flex;
+  align-items: stretch;
+  background-color: var(--theme-bg);
+  border: 1px solid var(--theme-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.copy-group-container:hover {
+  border-color: rgba(var(--theme-blue), 0.5);
+}
+
+/* Action Button styling for cards */
+.card-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.75rem;
+  background-color: rgba(var(--theme-panel-rgb), 0.5);
+  border-left: 1px solid var(--theme-border);
+  color: var(--theme-muted);
+  transition: all 0.2s ease;
+}
+
+.card-action-btn:hover {
+  background-color: rgb(var(--theme-blue));
+  color: white;
+}
+
+/* Branch specific accents */
+.text-theme-purple {
+  color: rgb(var(--theme-purple));
+}
+
+.bg-theme-purple\/10 {
+  background-color: rgba(var(--theme-purple), 0.1);
+}
+
+.ring-theme-purple\/20 {
+  box-shadow: 0 0 0 1px rgba(var(--theme-purple), 0.2);
+}
+
+/* Animation for Tab switching */
+.fade-in-slide {
+  animation: fadeInSlide 0.3s ease-out forwards;
+}
+
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

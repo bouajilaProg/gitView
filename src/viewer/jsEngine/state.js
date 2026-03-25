@@ -46,7 +46,8 @@ export const ui = {
   commandsContent: document.getElementById('commands-content'),
   commandsList: document.getElementById('detail-commands'),
   copyHashBtn: document.getElementById('copy-hash'),
-  filesCountSpan: document.getElementById('files-count')
+  filesCountSpan: document.getElementById('files-count'),
+  detailHashShort: document.getElementById('detail-hash-short')
 };
 
 export function getThemeVar(name) {
