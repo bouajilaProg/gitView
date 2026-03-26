@@ -110,6 +110,7 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 	}
 
 	applyMergedBranchFallbacks(commits, mergedBranchByCommit, commitRefs, branchLaneNames)
+	predictedBranches := predictMergedBranchRefs(commits, mergedBranchByCommit)
 
 	// Build the graph structure
 	graph := &Graph{
@@ -126,14 +127,15 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 			maxLane = c.Lane
 		}
 		node := Node{
-			ID:      c.Hash[:7],
-			Hash:    c.Hash,
-			Message: c.Message,
-			Author:  c.Author,
-			Date:    c.Date.Format(time.RFC3339),
-			Files:   c.Files,
-			Lane:    c.Lane,
-			Refs:    commitRefs[c.Hash],
+			ID:              c.Hash[:7],
+			Hash:            c.Hash,
+			Message:         c.Message,
+			Author:          c.Author,
+			Date:            c.Date.Format(time.RFC3339),
+			Files:           c.Files,
+			Lane:            c.Lane,
+			Refs:            commitRefs[c.Hash],
+			PredictedBranch: predictedBranches[c.Hash],
 		}
 		graph.Nodes = append(graph.Nodes, node)
 
@@ -299,4 +301,123 @@ func applyMergedBranchFallbacks(commits map[string]*CommitData, mergedBranches m
 			commitRefs[mergedParent] = []string{branchName}
 		}
 	}
+}
+
+func predictMergedBranchRefs(commits map[string]*CommitData, mergedBranches map[string]string) map[string]string {
+	result := make(map[string]string)
+	if len(mergedBranches) == 0 {
+		return result
+	}
+
+	for mergeHash, branchName := range mergedBranches {
+		mergeCommit, exists := commits[mergeHash]
+		if !exists || len(mergeCommit.Parents) < 2 {
+			continue
+		}
+
+		mainParent := mergeCommit.Parents[0]
+		mergedParent := mergeCommit.Parents[1]
+		mergeBase := findMergeBase(commits, mainParent, mergedParent)
+		if mergeBase == "" {
+			continue
+		}
+
+		visited := make(map[string]bool)
+		stack := []string{mergedParent}
+		for len(stack) > 0 {
+			current := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if visited[current] {
+				continue
+			}
+			visited[current] = true
+
+			if current == mergeBase {
+				continue
+			}
+
+			commit, ok := commits[current]
+			if !ok {
+				continue
+			}
+
+			if _, exists := result[current]; !exists {
+				result[current] = branchName
+			}
+
+			for _, parent := range commit.Parents {
+				if !visited[parent] {
+					stack = append(stack, parent)
+				}
+			}
+		}
+	}
+
+	return result
+}
+
+func findMergeBase(commits map[string]*CommitData, mainParent string, mergedParent string) string {
+	if mainParent == "" || mergedParent == "" {
+		return ""
+	}
+
+	mainAncestors := collectAncestors(commits, mainParent)
+	if len(mainAncestors) == 0 {
+		return ""
+	}
+
+	visited := make(map[string]bool)
+	queue := []string{mergedParent}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if visited[current] {
+			continue
+		}
+		visited[current] = true
+
+		if _, ok := mainAncestors[current]; ok {
+			return current
+		}
+
+		commit, ok := commits[current]
+		if !ok {
+			continue
+		}
+		for _, parent := range commit.Parents {
+			if !visited[parent] {
+				queue = append(queue, parent)
+			}
+		}
+	}
+
+	return ""
+}
+
+func collectAncestors(commits map[string]*CommitData, start string) map[string]struct{} {
+	ancestors := make(map[string]struct{})
+	if start == "" {
+		return ancestors
+	}
+
+	stack := []string{start}
+	for len(stack) > 0 {
+		current := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if _, seen := ancestors[current]; seen {
+			continue
+		}
+		ancestors[current] = struct{}{}
+		commit, ok := commits[current]
+		if !ok {
+			continue
+		}
+		for _, parent := range commit.Parents {
+			if _, seen := ancestors[parent]; !seen {
+				stack = append(stack, parent)
+			}
+		}
+	}
+
+	return ancestors
 }

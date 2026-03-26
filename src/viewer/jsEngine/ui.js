@@ -144,8 +144,13 @@ export function showDetail(node) {
     if (refs.length > 0) {
       branchEl.textContent = refs.join(', ');
     } else {
-      const laneMatch = state.graphData?.lanes?.find(lane => lane.index === node.lane);
-      branchEl.textContent = laneMatch?.name?.trim() || '--';
+      const predicted = (node.predictedBranch || '').trim();
+      if (predicted) {
+        branchEl.textContent = predicted;
+      } else {
+        const laneMatch = state.graphData?.lanes?.find(lane => lane.index === node.lane);
+        branchEl.textContent = laneMatch?.name?.trim() || '--';
+      }
     }
   }
 
