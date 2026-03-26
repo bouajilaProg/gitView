@@ -256,12 +256,26 @@ func parseMergedBranchName(message string) string {
 		if len(matches) < 2 {
 			continue
 		}
-		name := strings.TrimSpace(matches[1])
+		name := sanitizeMergedBranchName(matches[1])
 		if name != "" {
 			return name
 		}
 	}
 	return ""
+}
+
+func sanitizeMergedBranchName(value string) string {
+	name := strings.TrimSpace(value)
+	name = strings.TrimPrefix(name, "refs/heads/")
+	name = strings.TrimPrefix(name, "refs/remotes/")
+	name = strings.TrimPrefix(name, "origin/")
+
+	upper := strings.ToUpper(name)
+	if upper == "HEAD" || strings.HasPrefix(upper, "HEAD ") || strings.HasPrefix(upper, "HEAD-") || strings.HasPrefix(upper, "HEAD@") {
+		return ""
+	}
+
+	return name
 }
 
 func applyMergedBranchFallbacks(commits map[string]*CommitData, mergedBranches map[string]string, commitRefs map[string][]string, branchLaneNames map[int][]string) {
@@ -275,25 +289,14 @@ func applyMergedBranchFallbacks(commits map[string]*CommitData, mergedBranches m
 			continue
 		}
 		if len(mergeCommit.Parents) < 2 {
-			if len(commitRefs[mergeHash]) == 0 {
-				commitRefs[mergeHash] = []string{branchName}
-				lane := mergeCommit.Lane
-				if lane >= 0 && !containsString(branchLaneNames[lane], branchName) {
-					branchLaneNames[lane] = append(branchLaneNames[lane], branchName)
-				}
-			}
 			continue
 		}
 
+		// Only assign the branch name to the merged parent (pre-merge commit)
+		// Don't add to branchLaneNames to avoid showing on all commits in that lane
 		mergedParent := mergeCommit.Parents[1]
 		if len(commitRefs[mergedParent]) == 0 {
 			commitRefs[mergedParent] = []string{branchName}
-			if commit, ok := commits[mergedParent]; ok {
-				lane := commit.Lane
-				if lane >= 0 && !containsString(branchLaneNames[lane], branchName) {
-					branchLaneNames[lane] = append(branchLaneNames[lane], branchName)
-				}
-			}
 		}
 	}
 }
