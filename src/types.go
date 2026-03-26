@@ -10,14 +10,15 @@ type FileStat struct {
 
 // Node represents a commit node in the graph
 type Node struct {
-	ID      string     `json:"id"`
-	Hash    string     `json:"hash"`
-	Message string     `json:"message"`
-	Author  string     `json:"author"`
-	Date    string     `json:"date"`
-	Files   []FileStat `json:"files"`
-	Lane    int        `json:"lane"`
-	Refs    []string   `json:"refs"`
+	ID              string     `json:"id"`
+	Hash            string     `json:"hash"`
+	Message         string     `json:"message"`
+	Author          string     `json:"author"`
+	Date            string     `json:"date"`
+	Files           []FileStat `json:"files"`
+	Lane            int        `json:"lane"`
+	Refs            []string   `json:"refs"`
+	PredictedBranch string     `json:"predictedBranch"`
 }
 
 // Edge represents a connection between commits
