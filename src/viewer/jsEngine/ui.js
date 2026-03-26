@@ -164,7 +164,7 @@ export function showDetail(node) {
   if (node.files && node.files.length > 0) {
     node.files.forEach(file => {
       const div = document.createElement('div');
-      div.className = 'group flex items-center gap-3 text-xs py-2 px-3 hover:bg-theme-blue/5 rounded-lg border border-transparent hover:border-theme-blue/10 transition-all truncate';
+      div.className = 'group flex items-center gap-3 text-xs py-2 px-1 hover:bg-theme-blue/5 rounded-lg border border-transparent hover:border-theme-blue/10 transition-all truncate';
 
       const statusIcon = document.createElement('div');
       let statusColor = 'bg-theme-blue/10 text-theme-blue ring-theme-blue/20';
