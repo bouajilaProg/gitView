@@ -146,8 +146,19 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 		graph.Nodes = append(graph.Nodes, node)
 
 		// Add edges to parents
+		// Skip edges from dedicated (unmerged) lanes to different lanes
+		// unless this commit has multiple parents (is a merge commit)
 		for index, parent := range c.Parents {
 			if parentCommit, exists := commits[parent]; exists {
+				// If on a dedicated lane and parent is on a different lane,
+				// only draw edge if this is a merge commit (has multiple parents)
+				if laneTypes[c.Lane] == "dedicated" && parentCommit.Lane != c.Lane {
+					if len(c.Parents) == 1 {
+						// Skip edge - unmerged branch pointing back to main
+						continue
+					}
+				}
+
 				colorLane := c.Lane
 				if index > 0 {
 					colorLane = parentCommit.Lane
