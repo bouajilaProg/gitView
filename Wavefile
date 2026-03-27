@@ -8,7 +8,7 @@ tags = ["dev-tools","git"]
 [flow]
   dev = {
      cmd= "./tools/tailwindcss -c tailwind.config.js -i src/viewer/style/tailwind.css -o src/viewer/style/output.css && go build -o gitView ./src",
-     on_success= "./gitView",
+     on_success= "mv ./gitView ../test/gitView && cd ../test && ./gitView",
      watch=["*.go","assets/*","src/**/*","tailwind.config.js","src/viewer/style/tailwind.css"]
    }
   build = {
