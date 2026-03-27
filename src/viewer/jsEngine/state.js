@@ -4,14 +4,24 @@ export const COLUMN_WIDTH = 120;
 export const HIT_RADIUS = 25;
 
 export const LANE_COLORS = [
-  '#22c55e',
-  '#3b82f6',
-  '#f59e0b',
-  '#ec4899',
-  '#8b5cf6',
-  '#06b6d4',
-  '#f97316',
-  '#84cc16'
+  '#4ade80', // Electric Green (Cool)
+  '#f87171', // Soft Red (Warm)
+  '#38bdf8', // Sky Blue (Cool)
+  '#fbbf24', // Amber (Warm)
+  '#818cf8', // Indigo (Cool)
+  '#f472b6', // Pink (Warm)
+  '#2dd4bf', // Teal (Cool)
+  '#fb923c', // Orange (Warm)
+  '#a78bfa', // Lavender (Cool)
+  '#e879f9', // Fuchsia (Warm/Cool bridge)
+  '#4ade80', // Mint (Cool)
+  '#facc15', // Bright Yellow (Warm)
+  '#60a5fa', // Bright Blue (Cool)
+  '#fb7185', // Rose (Warm)
+  '#22d3ee', // Cyan (Cool)
+  '#c084fc', // Purple (Warm/Cool bridge)
+  '#bef264', // Lime (Warm-ish)
+  '#94a3b8'  // Steel Blue/Slate (Neutral contrast)
 ];
 
 export const state = {

@@ -31,7 +31,8 @@ export function screenToWorld(x, y) {
 }
 
 function getLaneColor(lane) {
-  return LANE_COLORS[lane % LANE_COLORS.length];
+  const offset = (lane * 5) % LANE_COLORS.length;
+  return LANE_COLORS[offset];
 }
 
 function getEdgeColor(edge) {
