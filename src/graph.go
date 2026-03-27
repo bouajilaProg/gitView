@@ -71,7 +71,7 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 
 	// Perform topological sort and assign lanes
 	sortedOrder := topologicalSort(commits, commitOrder)
-	assignLanes(commits, sortedOrder)
+	laneTypes := assignLanes(commits, sortedOrder)
 
 	// Map lane names from branch tips
 	branchLaneNames := make(map[int][]string)
@@ -168,7 +168,11 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 				names = orderBranchNames(names, headName)
 			}
 			laneName := strings.Join(names, ", ")
-			graph.Lanes = append(graph.Lanes, Lane{Index: lane, Name: laneName})
+			lType := "dedicated"
+			if t, ok := laneTypes[lane]; ok && t != "" {
+				lType = t
+			}
+			graph.Lanes = append(graph.Lanes, Lane{Index: lane, Name: laneName, Type: lType})
 		}
 	}
 
