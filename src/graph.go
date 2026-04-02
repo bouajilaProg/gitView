@@ -150,6 +150,9 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 	applyMergedBranchFallbacks(commits, mergedBranchByCommit, commitRefs, branchLaneNames)
 	predictedBranches := predictMergedBranchRefs(commits, mergedBranchByCommit)
 
+	// Propagate branch names to all commits in unmerged branches
+	propagateUnmergedBranchNames(repo, commits, predictedBranches)
+
 	// Build the graph structure
 	graph := &Graph{
 		Nodes: make([]Node, 0, len(sortedOrder)),
@@ -560,6 +563,95 @@ func predictMergedBranchRefs(commits map[string]*CommitData, mergedBranches map[
 	}
 
 	return result
+}
+
+// propagateUnmergedBranchNames walks from each unmerged branch tip back to
+// the fork point and assigns the branch name to all commits on that lane.
+func propagateUnmergedBranchNames(repo *git.Repository, commits map[string]*CommitData, predictedBranches map[string]string) {
+	// Build child map to detect branch tips (commits with no children)
+	childrenOf := make(map[string][]string)
+	for hash, commit := range commits {
+		for _, parentHash := range commit.Parents {
+			if _, exists := commits[parentHash]; exists {
+				childrenOf[parentHash] = append(childrenOf[parentHash], hash)
+			}
+		}
+	}
+
+	// Identify commits that are second+ parents of merge commits (merged tips)
+	mergedTips := make(map[string]bool)
+	for _, c := range commits {
+		if len(c.Parents) >= 2 {
+			for _, p := range c.Parents[1:] {
+				mergedTips[p] = true
+			}
+		}
+	}
+
+	// Get branch tips and their names
+	branchIter, err := repo.Branches()
+	if err != nil {
+		return
+	}
+
+	_ = branchIter.ForEach(func(branchRef *plumbing.Reference) error {
+		branchName := branchRef.Name().Short()
+		branchHash := branchRef.Hash().String()
+
+		commit, exists := commits[branchHash]
+		if !exists {
+			return nil
+		}
+
+		// Skip merged branches - they're handled by predictMergedBranchRefs
+		if mergedTips[branchHash] {
+			return nil
+		}
+
+		// Skip main/master branches
+		if branchName == "main" || branchName == "master" {
+			return nil
+		}
+
+		branchLane := commit.Lane
+
+		// Walk back from branch tip until we hit a commit on a different lane
+		// or a commit that's already assigned a different branch
+		visited := make(map[string]bool)
+		stack := []string{branchHash}
+		for len(stack) > 0 {
+			current := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if visited[current] {
+				continue
+			}
+			visited[current] = true
+
+			c, ok := commits[current]
+			if !ok {
+				continue
+			}
+
+			// Stop if we've left this branch's lane
+			if c.Lane != branchLane {
+				continue
+			}
+
+			// Assign branch name if not already assigned
+			if _, exists := predictedBranches[current]; !exists {
+				predictedBranches[current] = branchName
+			}
+
+			// Continue to parents on same lane
+			for _, parent := range c.Parents {
+				if !visited[parent] {
+					stack = append(stack, parent)
+				}
+			}
+		}
+
+		return nil
+	})
 }
 
 func findMergeBase(commits map[string]*CommitData, mainParent string, mergedParent string) string {
