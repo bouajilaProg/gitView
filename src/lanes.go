@@ -7,6 +7,7 @@ import "sort"
 // 1. Main branch (first parents) stays on lane 0
 // 2. Each merged branch segment gets its own unique lane (no reuse)
 // 3. Active (unmerged) branches get dedicated lanes
+// 4. When a branch ends at a commit, no new branch from that commit can reuse its lane
 func assignLanes(commits map[string]*CommitData, sortedOrder []string) map[int]string {
 	// Build child map: parent -> list of children
 	childrenOf := make(map[string][]string)
@@ -47,6 +48,10 @@ func assignLanes(commits map[string]*CommitData, sortedOrder []string) map[int]s
 	laneTypes := make(map[int]string)   // lane -> "dedicated" or "merged"
 	nextLane := 0
 
+	// Track lanes that are "blocked" at each commit (lanes ending there)
+	// When a branch ends at commit X with lane L, no other branch from X should use L
+	blockedLanesAt := make(map[string]map[int]bool)
+
 	// Determine if a commit is on an unmerged branch (has no children = branch tip)
 	hasNoChildren := make(map[string]bool)
 	for _, hash := range sortedOrder {
@@ -72,6 +77,9 @@ func assignLanes(commits map[string]*CommitData, sortedOrder []string) map[int]s
 		} else {
 			children := childrenOf[hash]
 
+			// Get blocked lanes at this commit (lanes from children that end here)
+			blocked := blockedLanesAt[hash]
+
 			// PRIORITY 1: If we are the first parent of a merge commit, inherit its lane
 			// This maintains main branch continuity through merges
 			for _, childHash := range children {
@@ -91,6 +99,10 @@ func assignLanes(commits map[string]*CommitData, sortedOrder []string) map[int]s
 					if childLane, exists := commitLanes[childHash]; exists {
 						childCommit := commits[childHash]
 						if len(childCommit.Parents) > 0 && childCommit.Parents[0] == hash {
+							// Don't inherit if this lane is blocked (another branch ends here)
+							if blocked != nil && blocked[childLane] {
+								continue
+							}
 							assignedLane = childLane
 							break
 						}
@@ -104,6 +116,10 @@ func assignLanes(commits map[string]*CommitData, sortedOrder []string) map[int]s
 					if childLane, exists := commitLanes[childHash]; exists {
 						childCommit := commits[childHash]
 						if len(childCommit.Parents) == 1 {
+							// Don't inherit if this lane is blocked
+							if blocked != nil && blocked[childLane] {
+								continue
+							}
 							assignedLane = childLane
 							break
 						}
@@ -125,6 +141,19 @@ func assignLanes(commits map[string]*CommitData, sortedOrder []string) map[int]s
 
 		commit.Lane = assignedLane
 		commitLanes[hash] = assignedLane
+
+		// Mark lanes as blocked at parent commits when this is not their first parent
+		// This prevents color reuse when multiple branches fork from the same commit
+		for i, parentHash := range commit.Parents {
+			if i > 0 {
+				// This commit is a non-first child of its parent
+				// Block this lane at the parent so siblings don't reuse it
+				if blockedLanesAt[parentHash] == nil {
+					blockedLanesAt[parentHash] = make(map[int]bool)
+				}
+				blockedLanesAt[parentHash][assignedLane] = true
+			}
+		}
 	}
 
 	return laneTypes
