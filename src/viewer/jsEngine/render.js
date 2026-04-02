@@ -31,7 +31,8 @@ export function screenToWorld(x, y) {
 }
 
 function getLaneColor(lane) {
-  return LANE_COLORS[lane % LANE_COLORS.length];
+  const offset = (lane * 5) % LANE_COLORS.length;
+  return LANE_COLORS[offset];
 }
 
 function getEdgeColor(edge) {
@@ -52,14 +53,22 @@ function drawEdge(edge, source, target, sourceIndex, targetIndex) {
   ui.ctx.moveTo(startScreen.x, startScreen.y);
 
   if (start.y === end.y) {
+    // Same lane - draw straight horizontal line
     ui.ctx.lineTo(endScreen.x, endScreen.y);
   } else {
-    const midX = (startScreen.x + endScreen.x) / 2;
-    ui.ctx.bezierCurveTo(
-      midX, startScreen.y,
-      midX, endScreen.y,
-      endScreen.x, endScreen.y
-    );
+    // Different lanes - draw U-shape
+    // Always run horizontal on the lane that is further from lane 0 (main)
+    // This prevents overlap with main line
+    const sourceLane = source.lane;
+    const targetLane = target.lane;
+    
+    // Determine which lane is "lower" (further from main = higher lane number)
+    const lowerLaneY = Math.max(startScreen.y, endScreen.y);
+    
+    // U-shape: vertical to lower lane, horizontal on lower lane, vertical to target
+    ui.ctx.lineTo(startScreen.x, lowerLaneY);   // Vertical from source to lower lane
+    ui.ctx.lineTo(endScreen.x, lowerLaneY);     // Horizontal on lower lane
+    ui.ctx.lineTo(endScreen.x, endScreen.y);    // Vertical to target
   }
 
   ui.ctx.strokeStyle = getEdgeColor(edge);
