@@ -39,6 +39,7 @@ type Graph struct {
 type Lane struct {
 	Index int    `json:"index"`
 	Name  string `json:"name"`
+	Type  string `json:"type"`
 }
 
 // CommitData holds intermediate commit information

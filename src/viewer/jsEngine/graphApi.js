@@ -1,4 +1,4 @@
-import { state, ui } from './state.js';
+import { state, ui, COLUMN_WIDTH } from './state.js';
 import { render } from './render.js';
 
 export async function fetchGraph() {
@@ -20,6 +20,12 @@ export async function fetchGraph() {
     }
 
     state.graphData = data;
+
+    // Position camera to show the newest commit (rightmost) on screen
+    const totalNodes = data.nodes.length;
+    const newestX = (totalNodes - 1) * COLUMN_WIDTH;
+    state.camera.x = -newestX + ui.canvas.width / 2;
+
     render();
   } catch (err) {
     ui.loadingState.classList.add('hidden');

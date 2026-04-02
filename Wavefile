@@ -6,16 +6,19 @@ category = "personal"
 tags = ["dev-tools","git"]
 
 [flow]
-  dev = {
-     cmd= "./tools/tailwindcss -c tailwind.config.js -i src/viewer/style/tailwind.css -o src/viewer/style/output.css && go build -o gitView ./src",
-     on_success= "mv ./gitView ../test/ && ../test/gitView",
-     watch=["*.go","assets/*","src/**/*","tailwind.config.js","src/viewer/style/tailwind.css"]
-   }
+   dev = {
+      cmd= "./tools/tailwindcss -c tailwind.config.js -i src/viewer/style/tailwind.css -o src/viewer/style/output.css && go build -o gitView ./src",
+      on_success= "./gitView",
+      watch=["*.go","assets/*","src/**/*","tailwind.config.js","src/viewer/style/tailwind.css"]
+    }
   build = {
      cmd= "./tools/tailwindcss -c tailwind.config.js -i src/viewer/style/tailwind.css -o src/viewer/style/output.css --minify && go build -o gitView ./src"
    }
   test = {
      cmd= "go test ./src"
+   }
+  e2e = {
+     cmd= "GITVIEW_FIXTURE_REPO=../test go test ./src -run TestGraphFixtureComplete"
    }
   setup_linux = {
      cmd= "sh tools/setup-tailwind-linux.sh"
