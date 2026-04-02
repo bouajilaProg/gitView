@@ -70,20 +70,43 @@ func assignLanes(commits map[string]*CommitData, sortedOrder []string) map[int]s
 			nextLane++
 			laneTypes[assignedLane] = "merged"
 		} else {
-			// Check if any child already assigned a lane to us (lane inheritance)
 			children := childrenOf[hash]
+
+			// PRIORITY 1: If we are the first parent of a merge commit, inherit its lane
+			// This maintains main branch continuity through merges
 			for _, childHash := range children {
 				if childLane, exists := commitLanes[childHash]; exists {
 					childCommit := commits[childHash]
-					// If the child has only one parent, inherit its lane
-					if len(childCommit.Parents) == 1 {
-						assignedLane = childLane
-						break
-					}
-					// If we are the first parent of a merge commit, inherit its lane
 					if len(childCommit.Parents) > 1 && childCommit.Parents[0] == hash {
 						assignedLane = childLane
 						break
+					}
+				}
+			}
+
+			// PRIORITY 2: If we are the first parent of ANY child (including single-parent)
+			// This handles linear chains
+			if assignedLane == -1 {
+				for _, childHash := range children {
+					if childLane, exists := commitLanes[childHash]; exists {
+						childCommit := commits[childHash]
+						if len(childCommit.Parents) > 0 && childCommit.Parents[0] == hash {
+							assignedLane = childLane
+							break
+						}
+					}
+				}
+			}
+
+			// PRIORITY 3: Inherit from any single-parent child (fallback)
+			if assignedLane == -1 {
+				for _, childHash := range children {
+					if childLane, exists := commitLanes[childHash]; exists {
+						childCommit := commits[childHash]
+						if len(childCommit.Parents) == 1 {
+							assignedLane = childLane
+							break
+						}
 					}
 				}
 			}

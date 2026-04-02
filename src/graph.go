@@ -84,6 +84,19 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 	branchCreationTimes := getBranchCreationTimes(repo)
 
 	commitRefs := make(map[string][]string)
+
+	// Build a set of commits that are non-first parents of merge commits.
+	// A branch tip that appears as a non-first parent has been merged INTO
+	// another lane — we must not let it claim that lane's name.
+	mergedTips := make(map[string]bool)
+	for _, c := range commits {
+		if len(c.Parents) >= 2 {
+			for _, p := range c.Parents[1:] {
+				mergedTips[p] = true
+			}
+		}
+	}
+
 	branchIter, err := repo.Branches()
 	if err == nil {
 		_ = branchIter.ForEach(func(branchRef *plumbing.Reference) error {
@@ -92,12 +105,31 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 
 			commitRefs[branchHash] = append(commitRefs[branchHash], branchName)
 
-			if commit, exists := commits[branchHash]; exists {
-				lane := commit.Lane
-				names := branchLaneNames[lane]
-				if !containsString(names, branchName) {
-					branchLaneNames[lane] = append(names, branchName)
+			commit, exists := commits[branchHash]
+			if !exists {
+				return nil
+			}
+
+			// If this branch tip is a merged-in parent, its commits now live on
+			// the lane it was merged into (usually main/lane 0). Walk back up the
+			// parent chain to find the lane the branch actually lived on before
+			// the merge, and assign the name there instead.
+			if mergedTips[branchHash] {
+				targetLane := findOriginalLane(commits, branchHash, commit.Lane)
+				if targetLane >= 0 && targetLane != commit.Lane {
+					if !containsString(branchLaneNames[targetLane], branchName) {
+						branchLaneNames[targetLane] = append(branchLaneNames[targetLane], branchName)
+					}
+					return nil
 				}
+				// Could not determine original lane — skip to avoid polluting lane 0
+				return nil
+			}
+
+			lane := commit.Lane
+			names := branchLaneNames[lane]
+			if !containsString(names, branchName) {
+				branchLaneNames[lane] = append(names, branchName)
 			}
 			return nil
 		})
@@ -145,9 +177,9 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 		}
 		graph.Nodes = append(graph.Nodes, node)
 
-		// Add edges to parents
+		// Add edges to parents.
 		// Skip edges from dedicated (unmerged) lanes to different lanes
-		// unless this commit has multiple parents (is a merge commit)
+		// unless this commit has multiple parents (is a merge commit).
 		for index, parent := range c.Parents {
 			if parentCommit, exists := commits[parent]; exists {
 				// If on a dedicated lane and parent is on a different lane,
@@ -188,6 +220,36 @@ func buildGraph(repo *git.Repository) (*Graph, error) {
 	}
 
 	return graph, nil
+}
+
+// findOriginalLane walks from a merged branch tip back through its parents
+// to find the lane the branch actually lived on before being merged.
+// mergedOntoLane is the lane we want to escape from (e.g. lane 0 / main).
+// Returns -1 if no different lane is found.
+func findOriginalLane(commits map[string]*CommitData, tipHash string, mergedOntoLane int) int {
+	visited := make(map[string]bool)
+	stack := []string{tipHash}
+	for len(stack) > 0 {
+		hash := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if visited[hash] {
+			continue
+		}
+		visited[hash] = true
+		c, ok := commits[hash]
+		if !ok {
+			continue
+		}
+		if c.Lane != mergedOntoLane {
+			return c.Lane
+		}
+		for _, p := range c.Parents {
+			if !visited[p] {
+				stack = append(stack, p)
+			}
+		}
+	}
+	return -1
 }
 
 func containsString(values []string, value string) bool {
@@ -283,7 +345,6 @@ func getBranchCreationTimes(repo *git.Repository) map[string]time.Time {
 
 		// main/master are the default branches - treat them as "always existed"
 		if branchName == "main" || branchName == "master" {
-			// Don't add to result - they will be kept by filterLaneBranchNames
 			return nil
 		}
 
@@ -294,7 +355,6 @@ func getBranchCreationTimes(repo *git.Repository) map[string]time.Time {
 			return nil
 		}
 
-		// If we couldn't determine creation time, don't add to result (keep the branch)
 		return nil
 	})
 
@@ -316,7 +376,6 @@ func getBranchCreationFromReflog(reflogPath string) (time.Time, bool) {
 	scanner := bufio.NewScanner(file)
 	if scanner.Scan() {
 		line := scanner.Text()
-		// Reflog format: <old-hash> <new-hash> <author> <email> <timestamp> <timezone>\t<message>
 		parts := strings.SplitN(line, "\t", 2)
 		if len(parts) < 2 {
 			return time.Time{}, false
@@ -325,8 +384,6 @@ func getBranchCreationFromReflog(reflogPath string) (time.Time, bool) {
 		metaFields := strings.Fields(parts[0])
 		message := strings.ToLower(parts[1])
 
-		// Check if this is a real branch creation (first hash is zeros)
-		// and not a clone operation
 		if len(metaFields) < 2 {
 			return time.Time{}, false
 		}
@@ -335,14 +392,11 @@ func getBranchCreationFromReflog(reflogPath string) (time.Time, bool) {
 		isNewBranch := strings.HasPrefix(firstHash, "0000000")
 		isClone := strings.Contains(message, "clone")
 
-		// Only consider it a branch creation if it starts from zeros and isn't a clone
 		if !isNewBranch || isClone {
 			return time.Time{}, false
 		}
 
-		// Find the timestamp (Unix timestamp before timezone)
 		for i := len(metaFields) - 1; i >= 0; i-- {
-			// Timezone is like +0000 or -0500
 			if len(metaFields[i]) == 5 && (metaFields[i][0] == '+' || metaFields[i][0] == '-') {
 				if i > 0 {
 					var timestamp int64
@@ -400,9 +454,6 @@ func filterLaneBranchNames(
 		filtered := make([]string, 0, len(branchNames))
 		for _, branchName := range branchNames {
 			branchCreation, hasBranchTime := branchCreationTimes[branchName]
-			// Keep branch if:
-			// 1. We don't know when it was created (keep to be safe)
-			// 2. It was created before or at the same time as the oldest commit in the lane
 			if !hasBranchTime || !branchCreation.After(oldestCommit) {
 				filtered = append(filtered, branchName)
 			}
