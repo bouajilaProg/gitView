@@ -1,8 +1,4 @@
 # gitView
-
-[![Build](https://github.com/bouajilaProg/gitView/actions/workflows/build.yml/badge.svg)](https://github.com/bouajilaProg/gitView/actions/workflows/build.yml)
-[![Release](https://img.shields.io/github/v/release/bouajilaProg/gitView)](https://github.com/bouajilaProg/gitView/releases)
-
 Single-binary Git repository visualizer with an interactive DAG canvas.
 
 ## Features
